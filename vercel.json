@@ -1,0 +1,17 @@
+{
+    "builds": [
+        {
+            "src": "web_app.py",
+            "use": "@vercel/python"
+        }
+    ],
+    "routes": [
+        {
+            "src": "/(.*)",
+            "dest": "web_app.py"
+        }
+    ],
+    "env": {
+        "PYTHON_VERSION": "3.9"
+    }
+}

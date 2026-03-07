@@ -14,7 +14,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Fix ImageMagick policy to allow TextClip to work (MoviePy requirement)
-RUN sed -i 's/domain="path" rights="none" pattern="@\*"/domain="path" rights="read|write" pattern="@\*"/g' /etc/ImageMagick-6/policy.xml
+RUN POLICY_FILE=$(find /etc/ImageMagick* -name policy.xml | head -n 1) && \
+    if [ -n "$POLICY_FILE" ]; then \
+    sed -i 's/domain="path" rights="none" pattern="@\*"/domain="path" rights="read|write" pattern="@\*"/g' "$POLICY_FILE"; \
+    fi
 
 # Set work directory
 WORKDIR /app

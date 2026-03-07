@@ -200,3 +200,4 @@ Looking for a production-ready solution? Our [Premium API](https://docs.vadoo.tv
 If you find this project useful, please consider giving it a star! Your support helps us continue improving the project.
 
 [![GitHub stars](https://img.shields.io/github/stars/SamurAIGPT/Text-To-Video-AI?style=social)](https://github.com/SamurAIGPT/Text-To-Video-AI/stargazers)
+# Text-To-Video-AI-Tool

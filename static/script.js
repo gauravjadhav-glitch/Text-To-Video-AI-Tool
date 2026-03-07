@@ -15,6 +15,7 @@ const timerValue = document.getElementById('timer-value');
 const scriptBox = document.getElementById('final-script-display');
 const scriptUsedText = document.getElementById('script-used-text');
 const finalTimeValue = document.getElementById('final-time-value');
+const API_BASE_URL = "https://text-to-video-ai-tool.onrender.com";
 
 // 1. Dynamic Placeholder for Textarea
 modeRadios.forEach(radio => {
@@ -86,7 +87,7 @@ form.addEventListener('submit', async function (e) {
     formData.append('use_stock_images', useStock);
 
     try {
-        const response = await fetch('/generate', {
+        const response = await fetch(`${API_BASE_URL}/generate`, {
             method: 'POST',
             body: formData
         });
@@ -106,8 +107,8 @@ form.addEventListener('submit', async function (e) {
                 scriptUsedText.innerText = data.script_used;
             }
 
-            videoPreview.src = data.video_url;
-            downloadBtn.href = data.video_url;
+            videoPreview.src = `${API_BASE_URL}${data.video_url}`;
+            downloadBtn.href = `${API_BASE_URL}${data.video_url}`;
         } else {
             radarBox.classList.remove('active');
             statusText.innerText = "Generation Failed";

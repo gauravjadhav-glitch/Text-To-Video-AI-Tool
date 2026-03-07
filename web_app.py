@@ -12,7 +12,18 @@ from utility.render.render_engine import get_output_media
 from utility.video.video_search_query_generator import getVideoSearchQueriesTimed, merge_empty_intervals
 from utility.config import get_config
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI()
+
+# Enable CORS for the Vercel frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # For production, you can restrict this to your Vercel URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

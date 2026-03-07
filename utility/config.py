@@ -33,7 +33,9 @@ class Config:
         if self._initialized:
             return
         
-        load_dotenv()
+        # Load .env file if it exists (local dev). On deployment platforms
+        # (Render, Heroku, etc.) env vars are injected directly - no file needed.
+        load_dotenv(override=False)
         
         self._validate_env_file()
         self._validate_configuration()
@@ -42,6 +44,11 @@ class Config:
         self._initialized = True
     
     def _validate_env_file(self) -> None:
+        # On deployment platforms (Render, Heroku, Railway, etc.), environment
+        # variables are injected directly into the process — no .env file needed.
+        # We skip the file check if a core env var is already set.
+        if os.getenv('LLM_PROVIDER'):
+            return
         env_path = os.path.join(os.getcwd(), '.env')
         if not os.path.exists(env_path):
             raise ConfigurationError(

@@ -45,16 +45,19 @@ class Config:
     
     def _validate_env_file(self) -> None:
         # On deployment platforms (Render, Heroku, Railway, etc.), environment
-        # variables are injected directly into the process — no .env file needed.
-        # We skip the file check if a core env var is already set.
-        if os.getenv('LLM_PROVIDER'):
-            return
+        # variables are injected directly into the process — no .env file is needed.
+        # We only raise an error if the .env file is missing AND no env vars are set.
         env_path = os.path.join(os.getcwd(), '.env')
-        if not os.path.exists(env_path):
-            raise ConfigurationError(
-                ".env file not found. Please create a .env file based on .env.example\n"
-                f"Expected location: {env_path}"
-            )
+        if os.path.exists(env_path):
+            return  # .env file found locally, all good
+        # Check if critical env vars are already in the environment (deployment platform)
+        critical_vars = ['LLM_PROVIDER', 'OPENAI_API_KEY', 'GROQ_API_KEY', 'GEMINI_API_KEY', 'PEXELS_API_KEY']
+        if any(os.getenv(var) for var in critical_vars):
+            return  # Running on a deployment platform with env vars injected
+        raise ConfigurationError(
+            ".env file not found. Please create a .env file based on .env.example\n"
+            f"Expected location: {env_path}"
+        )
     
     def _validate_configuration(self) -> None:
         errors = []

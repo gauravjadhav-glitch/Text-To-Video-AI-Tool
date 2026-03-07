@@ -13,22 +13,34 @@ from utility.video.video_search_query_generator import getVideoSearchQueriesTime
 from utility.config import get_config
 import argparse
 
-if __name__ == "__main__":
+async def main():
     parser = argparse.ArgumentParser(description="Generate a video from a topic.")
-    parser.add_argument("topic", type=str, help="The topic for the video")
+    parser.add_argument("topic", type=str, help="The topic for the video or the script itself")
+    parser.add_argument("--use-ai-images", action="store_true", help="Use AI generated images instead of Pexels videos")
+    parser.add_argument("--use-stock-images", action="store_true", help="Use Pexels images instead of Pexels videos (Faster than AI)")
+    parser.add_argument("--direct-script", action="store_true", help="Use the topic string directly as the script")
 
     args = parser.parse_args()
     SAMPLE_TOPIC = args.topic
     SAMPLE_FILE_NAME = "audio_tts.wav"
-    VIDEO_SERVER = "pexel"
+    
+    if args.use_ai_images:
+        VIDEO_SERVER = "stable_diffusion"
+    elif args.use_stock_images:
+        VIDEO_SERVER = "pexels_image"
+    else:
+        VIDEO_SERVER = "pexel"
     
     config = get_config()
     orientation_landscape = config.get_video_orientation()
 
-    response = generate_script(SAMPLE_TOPIC)
+    if args.direct_script:
+        response = SAMPLE_TOPIC
+    else:
+        response = generate_script(SAMPLE_TOPIC)
     print("script: {}".format(response))
 
-    asyncio.run(generate_audio(response, SAMPLE_FILE_NAME))
+    await generate_audio(response, SAMPLE_FILE_NAME)
 
     timed_captions = generate_timed_captions(SAMPLE_FILE_NAME)
     print(timed_captions)
@@ -38,7 +50,7 @@ if __name__ == "__main__":
 
     background_video_urls = None
     if search_terms is not None:
-        background_video_urls = generate_video_url(search_terms, VIDEO_SERVER, orientation_landscape=orientation_landscape)
+        background_video_urls = await generate_video_url(search_terms, VIDEO_SERVER, orientation_landscape=orientation_landscape)
         print(background_video_urls)
     else:
         print("No background video")
@@ -50,3 +62,6 @@ if __name__ == "__main__":
         print(video)
     else:
         print("No video")
+
+if __name__ == "__main__":
+    asyncio.run(main())

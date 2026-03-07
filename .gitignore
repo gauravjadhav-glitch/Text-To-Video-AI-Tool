@@ -1,5 +1,16 @@
 .logs/
 venv/
+.venv/
 __pycache__/
 .DS_Store
 .env
+*.mp4
+*.wav
+*.pyc
+.vscode/
+.idea/
+*.wav
+*.mp3
+*.png
+*.jpg
+temp/

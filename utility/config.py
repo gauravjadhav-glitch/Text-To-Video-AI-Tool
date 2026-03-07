@@ -89,10 +89,13 @@ class Config:
                 errors.append("Missing required API key: DEEPGRAM_API_KEY (required for STT_PROVIDER=deepgram)")
         
         tts_provider = os.getenv('TTS_PROVIDER', '').lower()
-        if tts_provider not in ['edgetts', 'elevenlabs']:
+        if tts_provider not in ['edgetts', 'elevenlabs', 'openai']:
             errors.append(
-                f"Invalid TTS_PROVIDER: '{tts_provider}'. Must be one of: edgetts, elevenlabs"
+                f"Invalid TTS_PROVIDER: '{tts_provider}'. Must be one of: edgetts, elevenlabs, openai"
             )
+        elif tts_provider == 'openai':
+            if not os.getenv('OPENAI_API_KEY'):
+                errors.append("Missing required API key: OPENAI_API_KEY (required for TTS_PROVIDER=openai)")
         elif tts_provider == 'edgetts':
             if not os.getenv('EDGETTS_VOICE'):
                 errors.append("Missing required configuration: EDGETTS_VOICE (required for TTS_PROVIDER=edgetts)")
@@ -142,17 +145,26 @@ class Config:
             self._llm_client = genai.GenerativeModel(model_name)
         
         return self._llm_client
+
+    def get_openai_client(self):
+        """Always returns an OpenAI client for images/DALL-E, even if LLM_PROVIDER is something else."""
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            raise ConfigurationError("OPENAI_API_KEY not found in .env (required for AI images/DALL-E)")
+        return OpenAI(api_key=api_key)
     
     def get_stt_provider(self) -> Literal['whisper', 'deepgram']:
         return os.getenv('STT_PROVIDER', 'whisper').lower()
     
-    def get_tts_provider(self) -> Literal['edgetts', 'elevenlabs']:
+    def get_tts_provider(self) -> Literal['edgetts', 'elevenlabs', 'openai']:
         return os.getenv('TTS_PROVIDER', 'edgetts').lower()
     
     def get_tts_voice(self) -> str:
         provider = self.get_tts_provider()
         if provider == 'edgetts':
             return os.getenv('EDGETTS_VOICE', 'en-AU-WilliamNeural')
+        elif provider == 'openai':
+            return os.getenv('OPENAI_VOICE', 'coral')
         elif provider == 'elevenlabs':
             return os.getenv('ELEVENLABS_VOICE_ID', '21m00Tcm4TlvDq8ikWAM')
         raise ConfigurationError(f"Unknown TTS provider: {provider}")

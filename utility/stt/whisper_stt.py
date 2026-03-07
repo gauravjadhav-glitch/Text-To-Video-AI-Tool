@@ -3,10 +3,10 @@ from whisper_timestamped import load_model, transcribe_timestamped
 import re
 
 
-def generate_timed_captions(audio_filename, model_size="base"):
+def generate_timed_captions(audio_filename, model_size="base", language="mr"):
     WHISPER_MODEL = load_model(model_size)
     
-    gen = transcribe_timestamped(WHISPER_MODEL, audio_filename, verbose=False, fp16=False)
+    gen = transcribe_timestamped(WHISPER_MODEL, audio_filename, language=language, verbose=False, fp16=False)
     
     return getCaptionsWithTime(gen)
 
@@ -43,7 +43,7 @@ def getTimestampMapping(whisper_analysis):
 
 def cleanWord(word):
     
-    return re.sub(r'[^\w\s\-_%\']', '', word)
+    return re.sub(r'[^\w\s\-_%\'\u0080-\uFFFF]', '', word)
 
 
 def interpolateTimeFromDict(word_position, d):

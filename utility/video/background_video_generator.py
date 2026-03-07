@@ -2,6 +2,37 @@ import os
 import requests
 from utility.utils import log_response,LOG_TYPE_PEXEL
 from utility.config import get_config
+from utility.video.image_generator import get_images_for_video
+
+def search_photos(query_string, orientation_landscape=True):
+    config = get_config()
+    pexels_api_key = config.get_pexels_api_key()
+
+    url = "https://api.pexels.com/v1/search"
+    headers = {
+        "Authorization": pexels_api_key,
+        "User-Agent": "Mozilla/5.0"
+    }
+    params = {
+        "query": query_string,
+        "orientation": "landscape" if orientation_landscape else "portrait",
+        "per_page": 1
+    }
+
+    response = requests.get(url, headers=headers, params=params)
+    return response.json()
+
+def getBestPhoto(query_string, orientation_landscape=True):
+    data = search_photos(query_string, orientation_landscape)
+    if 'photos' in data and data['photos']:
+        # Extract the highest resolution link
+        # For portrait we want large2x or original
+        photo = data['photos'][0]
+        if orientation_landscape:
+            return photo['src']['landscape']
+        else:
+            return photo['src']['portrait']
+    return None
 
 def search_videos(query_string, orientation_landscape=True):
     config = get_config()
@@ -32,49 +63,70 @@ def search_videos(query_string, orientation_landscape=True):
 
     return json_data
 
-
 def getBestVideo(query_string, orientation_landscape=True, used_vids=[]):
     vids = search_videos(query_string, orientation_landscape)
     videos = vids['videos']  # Extract the videos list from JSON
 
-    # Filter and extract videos with width and height as 1920x1080 for landscape or 1080x1920 for portrait
+    # Filter and extract videos based on orientation
     if orientation_landscape:
-        filtered_videos = [video for video in videos if video['width'] >= 1920 and video['height'] >= 1080 and video['width']/video['height'] == 16/9]
+        filtered_videos = [video for video in videos if video['width'] > video['height']]
     else:
-        filtered_videos = [video for video in videos if video['width'] >= 1080 and video['height'] >= 1920 and video['height']/video['width'] == 16/9]
+        filtered_videos = [video for video in videos if video['height'] > video['width']]
 
-    # Sort the filtered videos by duration in ascending order
+    # If no results match orientation, just use the original list
+    if not filtered_videos:
+        filtered_videos = videos
+
+    # Sort the filtered videos by duration, preferring videos around 10-15 seconds
     sorted_videos = sorted(filtered_videos, key=lambda x: abs(15-int(x['duration'])))
 
-    # Extract the top 3 videos' URLs
+    # Extract the video URLs
     for video in sorted_videos:
+        # Pexels provides multiple files, try to find a good one
+        best_file = None
         for video_file in video['video_files']:
+            # Prefer HD/Full HD but accept anything
             if orientation_landscape:
-                if video_file['width'] == 1920 and video_file['height'] == 1080:
-                    if not (video_file['link'].split('.hd')[0] in used_vids):
-                        return video_file['link']
+                if video_file['width'] >= 1280 and video_file['height'] >= 720:
+                    best_file = video_file['link']
+                    break
             else:
-                if video_file['width'] == 1080 and video_file['height'] == 1920:
-                    if not (video_file['link'].split('.hd')[0] in used_vids):
-                        return video_file['link']
+                if video_file['height'] >= 1280 and video_file['width'] >= 720:
+                    best_file = video_file['link']
+                    break
+        
+        # If no preferred file found, just take the first one
+        if not best_file and video['video_files']:
+            best_file = video['video_files'][0]['link']
+            
+        if best_file and not (best_file.split('.hd')[0] in used_vids):
+            return best_file
+
     print("NO LINKS found for this round of search with query :", query_string)
     return None
 
 
-def generate_video_url(timed_video_searches,video_server, orientation_landscape=True):
-        timed_video_urls = []
-        if video_server == "pexel":
-            used_links = []
-            for (t1, t2), search_terms in timed_video_searches:
-                url = ""
-                for query in search_terms:
-                   
-                    url = getBestVideo(query, orientation_landscape=orientation_landscape, used_vids=used_links)
-                    if url:
-                        used_links.append(url.split('.hd')[0])
-                        break
-                timed_video_urls.append([[t1, t2], url])
-        elif video_server == "stable_diffusion":
-            timed_video_urls = get_images_for_video(timed_video_searches)
+async def generate_video_url(timed_video_searches, video_server, orientation_landscape=True):
+    timed_video_urls = []
+    if video_server == "pexel":
+        used_links = []
+        for (t1, t2), search_terms in timed_video_searches:
+            url = ""
+            for query in search_terms:
+                url = getBestVideo(query, orientation_landscape=orientation_landscape, used_vids=used_links)
+                if url:
+                    used_links.append(url.split('.hd')[0])
+                    break
+            timed_video_urls.append([[t1, t2], url])
+    elif video_server == "stable_diffusion":
+        timed_video_urls = await get_images_for_video(timed_video_searches, orientation_landscape=orientation_landscape)
+    elif video_server == "pexels_image":
+        for (t1, t2), search_terms in timed_video_searches:
+            url = ""
+            for query in search_terms:
+                url = getBestPhoto(query, orientation_landscape=orientation_landscape)
+                if url:
+                    break
+            timed_video_urls.append([[t1, t2], url])
 
-        return timed_video_urls
+    return timed_video_urls

@@ -29,37 +29,36 @@ def clean_markdown(text):
     return text.strip()
 
 
-def generate_script(topic):
+def generate_script(topic, duration=60):
     config = get_config()
     client = config.get_llm_client()
     model = config.get_llm_model()
     provider = config.get_llm_provider()
     
+    word_count = 70 if duration == 30 else 140
+    
     prompt = (
-        """You are a seasoned content writer for a YouTube Shorts channel, specializing in facts videos. 
-        Your facts shorts are concise, each lasting less than 50 seconds (approximately 140 words). 
+        f"""You are a seasoned content writer for a YouTube Shorts channel, specializing in facts videos. 
+        Your facts shorts are concise, each lasting exactly {duration} seconds (approximately {word_count} words). 
         They are incredibly engaging and original. When a user requests a specific type of facts short, you will create it.
 
-        For instance, if the user asks for:
-        Weird facts
+        Important instructions:
+        - All content must be relevant to the specific topic requested.
+        - If the topic is related to a specific country (e.g., India), ensure the facts, cultural context, and tone reflect that accurately.
+        - Do not use random or unrelated information.
+        - If the script mentions a location, person, or event, it should be described in a way that allows for matching visuals.
+        - Maintain consistency with the story and ensure it is highly interesting and unique.
+
+        For instance, if the user asks for 'Weird facts about India':
         You would produce content like this:
-
-        Weird facts you don't know:
-        - Bananas are berries, but strawberries aren't.
-        - A single cloud can weigh over a million pounds.
-        - There's a species of jellyfish that is biologically immortal.
-        - Honey never spoils; archaeologists have found pots of honey in ancient Egyptian tombs that are over 3,000 years old and still edible.
-        - The shortest war in history was between Britain and Zanzibar on August 27, 1896. Zanzibar surrendered after 38 minutes.
-        - Octopuses have three hearts and blue blood.
-
-        You are now tasked with creating the best short script based on the user's requested type of 'facts'.
-
-        Keep it brief, highly interesting, and unique.
+        - The world's highest cricket ground is in Chail, Himachal Pradesh, built in 1893.
+        - India was the first country to mine diamonds.
+        - The village of Shani Shignapur has no doors or locks on any houses.
 
         Stictly output the script in a JSON format like below, and only provide a parsable JSON object with the key 'script'.
 
         # Output
-        {"script": "Here is the script ..."}
+        {{"script": "Here is the script ..."}}
         """
     )
     
@@ -84,7 +83,7 @@ def generate_script(topic):
             raise ValueError("No valid JSON found in response")
         
         script_text = text[json_start:json_end+1]
-        script = json.loads(script_text)["script"]
+        script = json.loads(script_text, strict=False)["script"]
         script = clean_markdown(script)
         return script
     except Exception as e:

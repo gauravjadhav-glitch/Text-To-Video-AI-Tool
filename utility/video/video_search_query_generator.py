@@ -5,21 +5,19 @@ from utility.utils import log_response, LOG_TYPE_GPT
 
 prompt = """# Instructions
 
-Given the following video script and timed captions, extract three visually concrete and specific keywords for each time segment that can be used to search for background videos. The keywords should be short and capture the main essence of the sentence. They can be synonyms or related terms. If a caption is vague or general, consider the next timed caption for more context. If a keyword is a single word, try to return a two-word keyword that is visually concrete. If a time frame contains two or more important pieces of information, divide it into shorter time frames with one keyword each. Ensure that the time periods are strictly consecutive and cover the entire length of the video. Each keyword should cover between 2-4 seconds. The output should be in JSON format, like this: [[[t1, t2], ["keyword1", "keyword2", "keyword3"]], [[t2, t3], ["keyword4", "keyword5", "keyword6"]], ...]. Please handle all edge cases, such as overlapping time segments, vague or general captions, and single-word keywords.
+Given the following video script and timed captions, extract three visually concrete and specific keywords for each time segment that can be used to search for background videos. The keywords should be short and capture the main essence of the sentence. They can be synonyms or related terms. If a caption is vague or general, consider the next timed caption for more context. If a keyword is a single word, try to return a two-word keyword that is visually concrete. Ensure that the time periods are strictly consecutive and cover the entire length of the video. Each keyword/segment should cover between 5-10 seconds. The output should be in JSON format, like this: [[[t1, t2], ["keyword1", "keyword2", "keyword3"]], [[t2, t3], ["keyword4", "keyword5", "keyword6"]], ...]. Please handle all edge cases, such as overlapping time segments, vague or general captions, and single-word keywords.
 
-For example, if the caption is 'The cheetah is the fastest land animal, capable of running at speeds up to 75 mph', the keywords should include 'cheetah running', 'fastest animal', and '75 mph'. Similarly, for 'The Great Wall of China is one of the most iconic landmarks in the world', the keywords should be 'Great Wall of China', 'iconic landmark', and 'China landmark'.
-
-Important Guidelines:
-
-Use only English in your text queries.
-Each search string must depict something visual.
-The depictions have to be extremely visually concrete, like rainy street, or cat sleeping.
-'emotional moment' <= BAD, because it doesn't depict something visually.
-'crying child' <= GOOD, because it depicts something visual.
-The list must always contain the most relevant and appropriate query searches.
-['Car', 'Car driving', 'Car racing', 'Car parked'] <= BAD, because it's 4 strings.
-['Fast car'] <= GOOD, because it's 1 string.
-['Un chien', 'une voiture rapide', 'une maison rouge'] <= BAD, because the text query is NOT in English.
+Rules for Relevant Visuals:
+1. All visuals must be relevant to the specific topic in the script.
+2. If the topic is related to India, use only visuals related to India or culturally accurate visuals.
+3. Match every search query with the specific scene in the script (e.g., if a location is mentioned, include that location in the query).
+4. Avoid unrelated international images.
+5. Use only English in your text queries.
+6. Each search string must depict something visual.
+7. The depictions have to be extremely visually concrete, like rainy street, or cat sleeping.
+8. 'emotional moment' <= BAD, because it doesn't depict something visually.
+9. 'crying child' <= GOOD, because it depicts something visual.
+10. The list must always contain the most relevant and appropriate query searches.
 
 Note: Your response should be the response only and no extra text or data.
   """
@@ -47,15 +45,15 @@ def getVideoSearchQueriesTimed(script,captions_timed):
                     return None
                 return out
             
-            content = call_OpenAI(script,captions_timed).replace("'",'"')
+            content = call_OpenAI(script,captions_timed)
             try:
-                out = json.loads(content)
+                out = json.loads(content, strict=False)
             except Exception as e:
                 print("JSON parse error, attempting to fix...")
                 print(e)
                 try:
                     content = fix_json(content.replace("```json", "").replace("```", ""))
-                    out = json.loads(content)
+                    out = json.loads(content, strict=False)
                 except Exception as e2:
                     print(f"Failed to fix JSON: {e2}")
                     retry_count += 1
@@ -63,7 +61,21 @@ def getVideoSearchQueriesTimed(script,captions_timed):
             
             if out[-1][0][1] != end:
                 retry_count += 1
-        
+                continue
+
+            # Merge segments shorter than 5s
+            merged = []
+            if out:
+                curr = out[0]
+                for i in range(1, len(out)):
+                    if (curr[0][1] - curr[0][0]) < 5.0:
+                        curr[0][1] = out[i][0][1]
+                        curr[1] = list(dict.fromkeys(curr[1] + out[i][1]))[:3]
+                    else:
+                        merged.append(curr)
+                        curr = out[i]
+                merged.append(curr)
+            return merged
         return out
     except Exception as e:
         print("error in response",e)

@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI YouTube Shorts Generator</title>
-    <meta name="description" content="Generate highly engaging shorts and videos effortlessly with AI">
+    <title>AI Video Generator — Shorts & Documentary</title>
+    <meta name="description" content="Generate highly engaging shorts and documentary videos effortlessly with AI">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css">
     <!-- FontAwesome for Icons -->
@@ -21,9 +21,9 @@
         <header>
             <div class="logo-box">
                 <i class="fa-solid fa-wand-magic-sparkles text-gradient"></i>
-                <h1 class="text-gradient">AI Shorts Creator</h1>
+                <h1 class="text-gradient">AI Video Creator</h1>
             </div>
-            <p class="subtitle">Turn any idea into a viral masterpiece. Built for mobile-first creators.</p>
+            <p class="subtitle">Turn any idea into a viral masterpiece — Shorts or Documentary. One click.</p>
         </header>
 
         <section class="app-layout">
@@ -34,19 +34,41 @@
                         <h2><i class="fa-solid fa-gears"></i> Creative Studio</h2>
                     </div>
                     <form id="generate-form">
-                        <!-- Duration Choice -->
+
+                        <!-- VIDEO TYPE: Shorts vs Documentary -->
                         <div class="choice-group">
-                            <label><i class="fa-regular fa-clock"></i> Video Duration</label>
+                            <label><i class="fa-solid fa-video"></i> Video Type</label>
                             <div class="segmented-control">
+                                <input type="radio" name="video_type" value="shorts" id="typeShorts" checked>
+                                <label for="typeShorts">⚡ Shorts</label>
+                                <input type="radio" name="video_type" value="documentary" id="typeDoc">
+                                <label for="typeDoc">🎬 Documentary</label>
+                            </div>
+                        </div>
+
+                        <!-- Duration Choice (changes based on type) -->
+                        <div class="choice-group" id="duration-group">
+                            <label><i class="fa-regular fa-clock"></i> Video Duration</label>
+                            <!-- Shorts durations -->
+                            <div class="segmented-control" id="shorts-duration">
                                 <input type="radio" name="duration" value="30" id="dur30">
                                 <label for="dur30">30 Seconds</label>
                                 <input type="radio" name="duration" value="60" id="dur60" checked>
                                 <label for="dur60">60 Seconds</label>
                             </div>
+                            <!-- Documentary durations (hidden by default) -->
+                            <div class="segmented-control" id="doc-duration" style="display:none;">
+                                <input type="radio" name="doc_duration" value="60" id="docDur60">
+                                <label for="docDur60">1 Min</label>
+                                <input type="radio" name="doc_duration" value="120" id="docDur120" checked>
+                                <label for="docDur120">2 Min</label>
+                                <input type="radio" name="doc_duration" value="180" id="docDur180">
+                                <label for="docDur180">3 Min</label>
+                            </div>
                         </div>
 
                         <!-- Language Choice -->
-                        <div class="choice-group">
+                        <div class="choice-group" id="language-group">
                             <label><i class="fa-solid fa-language"></i> Video Language</label>
                             <div class="segmented-control three-way"
                                 style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;">
@@ -63,8 +85,8 @@
                             </div>
                         </div>
 
-                        <!-- Mode Choice -->
-                        <div class="choice-group">
+                        <!-- Mode Choice (only for Shorts) -->
+                        <div class="choice-group" id="mode-group">
                             <label><i class="fa-solid fa-wand-magic-sparkles"></i> Generation Mode</label>
                             <div class="segmented-control">
                                 <input type="radio" name="mode" value="topic" id="modeTopic" checked>
@@ -80,8 +102,16 @@
                                 placeholder="E.g., Marathi facts about Indian kings..."></textarea>
                         </div>
 
-                        <!-- Media Source Option -->
-                        <div class="options-container">
+                        <!-- Documentary info box (hidden by default) -->
+                        <div class="info-box hidden" id="doc-info-box">
+                            <i class="fa-solid fa-circle-info"></i>
+                            <span>Sirf topic likho — AI automatically <strong>Hindi Script (Hook → Scenes → Closing
+                                    Line)</strong>
+                                + <strong>Cinematic Visuals</strong> generate karega aur directly video banayega!</span>
+                        </div>
+
+                        <!-- Media Source Option (only for Shorts) -->
+                        <div class="options-container" id="media-options">
                             <label class="toggle-switch">
                                 <input type="checkbox" id="use_ai_images" name="use_ai_images" checked>
                                 <span class="slider round"></span>
@@ -98,7 +128,7 @@
                         </div>
 
                         <button type="submit" class="generate-btn" id="generate-btn">
-                            <span class="btn-text">Build My Short</span>
+                            <span class="btn-text">Build My Video</span>
                             <i class="fa-solid fa-rocket run-icon"></i>
                             <div class="loader-spinner" id="loader-spinner"></div>
                         </button>
@@ -119,6 +149,28 @@
                         <div id="timer-container" class="timer-container hidden">
                             <i class="fa-regular fa-clock"></i>
                             <span id="timer-value">00:00</span>
+                        </div>
+                        <!-- Step progress for Documentary -->
+                        <div id="step-progress" class="step-progress hidden">
+                            <div class="step-item active" id="step-1">
+                                <div class="step-dot"></div>
+                                <span>📝 Script</span>
+                            </div>
+                            <div class="step-line"></div>
+                            <div class="step-item" id="step-2">
+                                <div class="step-dot"></div>
+                                <span>🎨 Visuals</span>
+                            </div>
+                            <div class="step-line"></div>
+                            <div class="step-item" id="step-3">
+                                <div class="step-dot"></div>
+                                <span>🔊 Audio</span>
+                            </div>
+                            <div class="step-line"></div>
+                            <div class="step-item" id="step-4">
+                                <div class="step-dot"></div>
+                                <span>🎬 Video</span>
+                            </div>
                         </div>
                     </div>
 

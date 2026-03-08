@@ -24,10 +24,8 @@ def generate_image_url_sync(prompt, size="1024x1792"):
         return None
 
 async def generate_image_url(prompt, size="1024x1792"):
-    loop = asyncio.get_event_loop()
-    # Using ThreadPoolExecutor because OpenAI client is synchronous
-    with ThreadPoolExecutor() as executor:
-        return await loop.run_in_executor(executor, generate_image_url_sync, prompt, size)
+    # Using asyncio.to_thread is more lightweight and uses the default executor
+    return await asyncio.to_thread(generate_image_url_sync, prompt, size)
 
 async def get_images_for_video(timed_video_searches, orientation_landscape=False):
     """
@@ -44,13 +42,19 @@ async def get_images_for_video(timed_video_searches, orientation_landscape=False
         for term in forbidden_terms:
             search_term = search_term.lower().replace(term, "historical event")
             
-        # Refined prompt for realism and YouTube Shorts appeal
-        prompt = (
-            f"A hyper-realistic, high-detail cinematic photograph of {search_term}. "
-            f"Style: National Geographic 8k photography, authentic cultural details, "
-            f"cinematic lighting, natural real-world textures, capturing a candid historical moment. "
-            f"No text, no watermarks, professional focus, real people, real places."
-        )
+        # If the prompt is already detailed (e.g., from documentary visual prompt generator),
+        # use it directly. Otherwise, wrap with standard cinematic template.
+        if len(search_term) > 100:
+            # Already a detailed documentary-style prompt — use as-is
+            prompt = search_term
+        else:
+            # Refined prompt for realism and YouTube Shorts appeal
+            prompt = (
+                f"A hyper-realistic, high-detail cinematic photograph of {search_term}. "
+                f"Style: National Geographic 8k photography, authentic cultural details, "
+                f"cinematic lighting, natural real-world textures, capturing a candid historical moment. "
+                f"No text, no watermarks, professional focus, real people, real places."
+            )
         
         tasks.append(generate_image_url(prompt, size=size))
     

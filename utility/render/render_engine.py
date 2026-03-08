@@ -161,7 +161,14 @@ def get_output_media(audio_file_path, timed_captions, background_video_data, vid
         video.duration = audio.duration
         video.audio = audio
 
-    video.write_videofile(OUTPUT_FILE_NAME, codec='libx264', audio_codec='aac', fps=25, preset='veryfast')
+    video.write_videofile(
+        OUTPUT_FILE_NAME, 
+        codec='libx264', 
+        audio_codec='aac', 
+        fps=24, 
+        preset='ultrafast',
+        threads=4
+    )
     
     # Clean up downloaded files
     for filename in downloaded_files:

@@ -562,3 +562,115 @@ video {
   border-color: var(--primary);
   transform: translateY(-2px);
 }
+
+/* ═══════════════════════════════════════════════════════
+   INFO BOX
+   ═══════════════════════════════════════════════════════ */
+.info-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 12px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.5rem;
+  color: var(--accent);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.info-box i {
+  font-size: 1.1rem;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.info-box span {
+  color: var(--text-muted);
+}
+
+.info-box strong {
+  color: var(--accent);
+}
+
+/* ═══════════════════════════════════════════════════════
+   STEP PROGRESS (Documentary pipeline)
+   ═══════════════════════════════════════════════════════ */
+.step-progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-top: 1.5rem;
+  width: 100%;
+  max-width: 400px;
+}
+
+.step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+}
+
+.step-item span {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-weight: 500;
+  transition: color 0.3s;
+}
+
+.step-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.4s ease;
+}
+
+.step-item.active .step-dot {
+  background: var(--primary);
+  border-color: var(--primary);
+  box-shadow: 0 0 12px rgba(192, 132, 252, 0.6);
+  animation: step-pulse 1.5s infinite ease-in-out;
+}
+
+.step-item.active span {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.step-item.done .step-dot {
+  background: #22c55e;
+  border-color: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
+}
+
+.step-item.done span {
+  color: #22c55e;
+}
+
+.step-line {
+  width: 30px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 4px;
+  margin-bottom: 1.5rem;
+  border-radius: 2px;
+}
+
+@keyframes step-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(192, 132, 252, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 20px rgba(192, 132, 252, 0.8);
+  }
+}

@@ -29,15 +29,32 @@ def clean_markdown(text):
     return text.strip()
 
 
-def generate_script(topic, duration=60):
+def generate_script(topic, duration=60, mode='shorts'):
+    """Generate a script.
+    mode='shorts'      -> YouTube Shorts style (original)
+    mode='documentary' -> Hindi documentary style with hooks, scenes & closing line
+    """
     config = get_config()
     client = config.get_llm_client()
     model = config.get_llm_model()
     provider = config.get_llm_provider()
-    
-    word_count = 70 if duration == 30 else 140
-    
-    prompt = (
+
+    if mode == 'documentary':
+        prompt = _build_documentary_prompt(duration)
+    else:
+        word_count = 70 if duration == 30 else 140
+        prompt = _build_shorts_prompt(duration, word_count)
+
+    if provider == 'gemini':
+        content = _call_gemini(client, topic, prompt)
+    else:
+        content = _call_openai_groq(client, model, topic, prompt)
+
+    return _parse_script_response(content)
+
+
+def _build_shorts_prompt(duration, word_count):
+    return (
         f"""You are a seasoned content writer for a YouTube Shorts channel, specializing in facts videos. 
         Your facts shorts are concise, each lasting exactly {duration} seconds (approximately {word_count} words). 
         They are incredibly engaging and original. When a user requests a specific type of facts short, you will create it.
@@ -55,41 +72,60 @@ def generate_script(topic, duration=60):
         - India was the first country to mine diamonds.
         - The village of Shani Shignapur has no doors or locks on any houses.
 
-        Stictly output the script in a JSON format like below, and only provide a parsable JSON object with the key 'script'.
+        Strictly output the script in a JSON format like below, and only provide a parsable JSON object with the key 'script'.
 
         # Output
         {{"script": "Here is the script ..."}}
         """
     )
-    
-    if provider == 'gemini':
-        content = _call_gemini(client, topic, prompt)
-    else:
-        content = _call_openai_groq(client, model, topic, prompt)
-    
+
+
+def _build_documentary_prompt(duration):
+    return (
+        f"""Aap ek professional Hindi documentary scriptwriter hain jo highly suspenseful aur gripping content likhte hain.
+        Aapko ek {duration} second ki documentary script likhni hai in Hindi mein.
+
+        Script ke avashyak hisse (MANDATORY STRUCTURE):
+        1. HOOK (5-8 seconds): Ek aisa powerful opening line jo viewer ko immediately rok de — ek shocking fact, ek burning sawaal, ya ek dramatic statement se shuru karo. Creator guidance mat likho.
+        2. SCENES (80%): Multiple cinematic scenes jo story ko aage badhate hain. Har scene suspense aur curiosity banaye rakhe. Short, punchy sentences use karo.
+        3. CLOSING LINE (last 5 seconds): Ek strong, memorable conclusion line jo viewer ke dimaag mein ghus jaye.
+
+        Zaruri niyam:
+        - Pure script ko SIRF Hindi mein likho
+        - Koi creator guidance nahi likhni (jaise: 'yahan cut karo', 'background mein yeh dikhao', etc.)
+        - Script directly bolne wali honi chahiye jaise koi narrator bol raha ho
+        - Suspense aur emotional tension throughout banaye rakho
+        - Strong hooks use karo jo viewer ko last tak roke
+        - Approximately {duration} seconds ki content likho
+
+        Sirf JSON format mein output do, koi extra text nahi:
+        {{"script": "Yahan script likho..."}}
+        """
+    )
+
+
+def _parse_script_response(content):
+    """Parse LLM response and extract clean script text."""
     try:
-        # Remove any common prefix that might be added by LLMs (content:, content =, content=, content: , etc.)
         text = content
-        for prefix in ['content:', 'content =', 'content =', 'content: ', 'content=']:
+        for prefix in ['content:', 'content =', 'content: ', 'content=']:
             if text.startswith(prefix):
                 text = text[len(prefix):].strip()
                 break
-        
-        # Try to find complete JSON object or array
+
         json_start = text.find('{')
         json_end = text.rfind('}')
-        
+
         if json_start == -1 or json_end == -1:
             raise ValueError("No valid JSON found in response")
-        
+
         script_text = text[json_start:json_end+1]
         script = json.loads(script_text, strict=False)["script"]
         script = clean_markdown(script)
         return script
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error parsing script response: {e}")
         raise
-    return script
 
 
 def _call_openai_groq(client, model, topic, prompt):

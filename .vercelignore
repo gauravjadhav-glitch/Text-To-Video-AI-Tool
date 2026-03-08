@@ -1,0 +1,16 @@
+# Ignore everything except static/ and vercel.json
+*
+!static/
+!vercel.json
+
+# Ignore node_modules if any
+node_modules/
+.venv/
+__pycache__/
+.git/
+.env
+*.mp4
+*.wav
+*.json
+!client_secrets.json
+!vercel.json

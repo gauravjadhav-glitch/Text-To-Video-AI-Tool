@@ -110,8 +110,9 @@ if (aiCheckbox && stockCheckbox) {
 // ═══════════════════════════════════════════════════════════════════
 function updateStep(stepNum, text) {
     // Reset all steps
-    for (let i = 1; i <= 4; i++) {
+    for (let i = 1; i <= 5; i++) {
         const el = document.getElementById(`step-${i}`);
+        if (!el) continue;
         el.classList.remove('active', 'done');
         if (i < stepNum) el.classList.add('done');
         if (i === stepNum) el.classList.add('active');
@@ -210,18 +211,30 @@ form.addEventListener('submit', async function (e) {
             const data = await response.json();
 
             if (response.ok && data.status === "success") {
-                statusOverlay.classList.add('hidden');
-                stepProgress.classList.add('hidden');
-                videoResult.classList.remove('hidden');
-                finalTimeValue.innerText = timerValue.innerText;
+                clearInterval(timerInterval); // Stop timer
+                updateStep(5, "Video Ready for Download!");
 
-                if (data.script_used) {
-                    scriptBox.classList.remove('hidden');
-                    scriptUsedText.innerText = data.script_used;
-                }
+                setTimeout(() => {
+                    statusOverlay.classList.add('hidden');
+                    stepProgress.classList.add('hidden');
+                    videoResult.classList.remove('hidden');
+                    finalTimeValue.innerText = timerValue.innerText;
 
-                videoPreview.src = `${API_BASE_URL}${data.video_url}`;
-                downloadBtn.href = `${API_BASE_URL}${data.video_url}`;
+                    if (data.script_used) {
+                        scriptBox.classList.remove('hidden');
+                        scriptUsedText.innerText = data.script_used;
+                    }
+
+                    const topic = textarea.value.trim().substring(0, 30).replace(/[^a-z0-9]/gi, '_');
+                    const fileName = `${topic || 'video'}.mp4`;
+
+                    videoPreview.src = `${API_BASE_URL}${data.video_url}`;
+                    downloadBtn.href = `${API_BASE_URL}${data.video_url}`;
+                    downloadBtn.setAttribute('download', fileName);
+
+                    // Auto-trigger the download
+                    setTimeout(() => downloadBtn.click(), 500);
+                }, 1000);
             } else {
                 radarBox.classList.remove('active');
                 stepProgress.classList.add('hidden');
@@ -239,6 +252,7 @@ form.addEventListener('submit', async function (e) {
             const data = await response.json();
 
             if (response.ok && data.status === "success") {
+                clearInterval(timerInterval); // Stop timer
                 statusOverlay.classList.add('hidden');
                 videoResult.classList.remove('hidden');
                 finalTimeValue.innerText = timerValue.innerText;
@@ -248,8 +262,15 @@ form.addEventListener('submit', async function (e) {
                     scriptUsedText.innerText = data.script_used;
                 }
 
+                const topic = textarea.value.trim().substring(0, 30).replace(/[^a-z0-9]/gi, '_');
+                const fileName = `${topic || 'video'}.mp4`;
+
                 videoPreview.src = `${API_BASE_URL}${data.video_url}`;
                 downloadBtn.href = `${API_BASE_URL}${data.video_url}`;
+                downloadBtn.setAttribute('download', fileName);
+
+                // Auto-trigger the download
+                setTimeout(() => downloadBtn.click(), 500);
             } else {
                 radarBox.classList.remove('active');
                 statusText.innerText = "Generation Failed";

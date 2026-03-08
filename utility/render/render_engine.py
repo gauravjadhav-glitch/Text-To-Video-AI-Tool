@@ -84,10 +84,9 @@ def get_output_media(audio_file_path, timed_captions, background_video_data, vid
                     if clip.h < 1920:
                         clip = clip.resize(height=1920)
                 
-                # Add a subtle zoom effect (Ken Burns)
-                # Zoom from 1.0 to 1.1 over the duration
-                clip = clip.resize(lambda t: 1.0 + 0.1 * (t / clip.duration))
-                
+                # Removed Ken Burns Zoom: Dynamic lambda resize forces MoviePy to do a 
+                # CPU-heavy Pillow resize for every single frame (e.g. 1440 times for 60s).
+                # Removing this makes rendering ultra-fast.
                 # Center the clip
                 clip = clip.set_position("center")
                 visual_clips.append(clip)

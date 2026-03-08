@@ -122,7 +122,10 @@ async def generate_video(
         # 4. Extract Timed Captions (passing the correct language to Whisper)
         # Note: we need to update timed_captions_generator to receive language
         from utility.stt.whisper_stt import generate_timed_captions as whisper_stt
-        timed_captions = whisper_stt(SAMPLE_FILE_NAME, language=stt_lang)
+        if is_documentary:
+            timed_captions = whisper_stt(SAMPLE_FILE_NAME, model_size="tiny", language=stt_lang, task="translate")
+        else:
+            timed_captions = whisper_stt(SAMPLE_FILE_NAME, model_size="tiny", language=stt_lang)
 
         # 5. Create Search Queries / Visual Prompts Map
         if is_documentary:

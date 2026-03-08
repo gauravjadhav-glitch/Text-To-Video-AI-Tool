@@ -11,9 +11,10 @@ Your task: For EACH numbered line, generate ONE highly detailed, documentary-sty
 IMPORTANT RULES:
 1. Every prompt must share the SAME consistent visual style: "cinematic documentary photography, dramatic golden-hour or desaturated color grade, shallow depth of field, film grain, high contrast, photorealistic, 8K".
 2. Every prompt must fit the SAME emotional theme: dark, historical, grave, suspenseful — as seen in BBC/Netflix documentary films.
-3. Each prompt must be in ENGLISH, highly descriptive, and visual (no abstract concepts).
-4. Do NOT include any creator notes, narration, or scene direction — only visual descriptions.
-5. Each prompt should be 2-4 sentences long.
+3. VERY IMPORTANT: DALL-E strictly blocks any descriptions of violence, blood, gore, weapons, dead bodies, or real-world massacres. YOU MUST avoid these concepts entirely! Instead, use symbolic and safe representations (e.g., "an abandoned historical courtyard with long shadows", "somber atmosphere with dust glowing in sunbeams", "empty streets", "discarded historical belongings"). Ensure every prompt passes strict safety filters.
+4. Each prompt must be in ENGLISH, highly descriptive, and visual (no abstract concepts).
+5. Do NOT include any creator notes, narration, or scene direction — only visual descriptions.
+6. Each prompt should be 2-4 sentences long.
 6. Output ONLY a JSON array like this:
 [
   {"line": 1, "prompt": "..."},

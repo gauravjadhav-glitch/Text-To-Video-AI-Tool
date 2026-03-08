@@ -543,6 +543,14 @@ video {
   object-fit: contain;
 }
 
+.download-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 20px;
+  width: 100%;
+}
+
 .download-btn {
   padding: 1rem 2rem;
   background: rgba(255, 255, 255, 0.1);
@@ -553,14 +561,18 @@ video {
   font-weight: 600;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   transition: all 0.3s;
+  width: 100%;
+  max-width: 300px;
 }
 
 .download-btn:hover {
   background: var(--primary);
   border-color: var(--primary);
   transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
 }
 
 /* ═══════════════════════════════════════════════════════

@@ -1,16 +1,10 @@
-# Ignore everything except static/ and vercel.json
-*
-!static/
-!vercel.json
-
-# Ignore node_modules if any
-node_modules/
 .venv/
 __pycache__/
 .git/
 .env
 *.mp4
 *.wav
-*.json
-!client_secrets.json
-!vercel.json
+audio_tts.wav
+audio_tts_web.wav
+rendered_video.mp4
+# Keep the static folder and vercel.json

@@ -1,9 +1,11 @@
-# Use an official Python runtime as a parent image
-FROM python:3.9-slim
+# Use a modern supported Python version
+FROM python:3.10-slim
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
+# Ensure MoviePy finds ImageMagick
+ENV IMAGEMAGICK_BINARY /usr/bin/convert
 
 # Install system dependencies for MoviePy and ImageMagick
 RUN apt-get update && apt-get install -y \
@@ -14,10 +16,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Fix ImageMagick policy to allow TextClip to work (MoviePy requirement)
-RUN POLICY_FILE=$(find /etc/ImageMagick* -name policy.xml | head -n 1) && \
-    if [ -n "$POLICY_FILE" ]; then \
-    sed -i 's/domain="path" rights="none" pattern="@\*"/domain="path" rights="read|write" pattern="@\*"/g' "$POLICY_FILE"; \
-    fi
+# This is crucial for Render/Vercel deployments
+RUN sed -i 's/domain="path" rights="none" pattern="@\*"/domain="path" rights="read|write" pattern="@\*"/g' /etc/ImageMagick-6/policy.xml || true
 
 # Set work directory
 WORKDIR /app
@@ -32,5 +32,5 @@ COPY . .
 # Expose port
 EXPOSE 8000
 
-# Run the application
-CMD ["uvicorn", "web_app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application with uvicorn (Production mode)
+CMD ["uvicorn", "web_app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: ai-video-generator-backend
+    env: docker
+    plan: starter
+    region: ohio
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: PEXELS_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: LLM_PROVIDER
+        value: openai
+      - key: VIDEO_ORIENTATION
+        value: portrait
+      - key: CAPTIONS_ENABLED
+        value: "true"
+      - key: CAPTION_FONT_FACE
+        value: /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
+      - key: IMAGEMAGICK_BINARY
+        value: /usr/bin/convert

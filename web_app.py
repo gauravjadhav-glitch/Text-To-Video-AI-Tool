@@ -248,3 +248,14 @@ async def generate_visual_prompts_endpoint(
         import traceback
         traceback.print_exc()
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+@app.get("/viral-ideas")
+async def get_viral_ideas(niche: str = "mystery"):
+    """Fetch viral topic ideas for a niche."""
+    try:
+        from utility.script.viral_engine import generate_viral_topics
+        topics = generate_viral_topics(niche, count=5)
+        return {"status": "success", "topics": topics}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

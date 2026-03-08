@@ -1,7 +1,48 @@
 // ═══════════════════════════════════════════════════════════════════
-//  CONFIG
+//  VIRAL IDEAS HANDLER
 // ═══════════════════════════════════════════════════════════════════
-const API_BASE_URL = "http://localhost:8000";
+const viralBtn = document.getElementById('get-viral-btn');
+const viralNiche = document.getElementById('viral-niche');
+const viralList = document.getElementById('viral-ideas-list');
+
+if (viralBtn) {
+    viralBtn.addEventListener('click', async () => {
+        const niche = viralNiche.value;
+        viralBtn.innerText = "Loading...";
+        viralBtn.disabled = true;
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/viral-ideas?niche=${niche}`);
+            const data = await response.json();
+
+            if (data.status === "success") {
+                viralList.innerHTML = '';
+                data.topics.forEach(topic => {
+                    const div = document.createElement('div');
+                    div.className = 'idea-item';
+                    div.innerText = topic;
+                    div.addEventListener('click', () => {
+                        textarea.value = topic;
+                        viralList.classList.add('hidden');
+                    });
+                    viralList.appendChild(div);
+                });
+                viralList.classList.remove('hidden');
+            }
+        } catch (err) {
+            console.error("Failed to fetch viral ideas:", err);
+        } finally {
+            viralBtn.innerText = "Fetch Ideas";
+            viralBtn.disabled = false;
+        }
+    });
+}
+// Production URL (Update this with your actual Render URL if using separate deployment)
+const RENDER_BACKEND_URL = "https://text-to-video-ai-tool.onrender.com";
+
+const API_BASE_URL = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ? "http://localhost:8000"
+    : (window.location.origin.includes("vercel.app") ? RENDER_BACKEND_URL : window.location.origin);
 
 // ═══════════════════════════════════════════════════════════════════
 //  SELECT ELEMENTS

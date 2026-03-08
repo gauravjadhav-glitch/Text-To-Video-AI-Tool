@@ -4,23 +4,17 @@ from utility.config import get_config
 from utility.utils import log_response, LOG_TYPE_GPT
 
 prompt = """# Instructions
+Given the following video script and timed captions, extract exactly THREE visually concrete keywords/segments for every 10 seconds of video.
 
-Given the following video script and timed captions, extract three visually concrete and specific keywords for each time segment that can be used to search for background videos. The keywords should be short and capture the main essence of the sentence. They can be synonyms or related terms. If a caption is vague or general, consider the next timed caption for more context. If a keyword is a single word, try to return a two-word keyword that is visually concrete. Ensure that the time periods are strictly consecutive and cover the entire length of the video. Each keyword/segment should cover between 5-10 seconds. The output should be in JSON format, like this: [[[t1, t2], ["keyword1", "keyword2", "keyword3"]], [[t2, t3], ["keyword4", "keyword5", "keyword6"]], ...]. Please handle all edge cases, such as overlapping time segments, vague or general captions, and single-word keywords.
+IMPORTANT RULES:
+1. Each visual segment MUST be at least 3.0 seconds long. NEVER create segments like [[1.0, 1.2]].
+2. For a 30-second video, you should return roughly 6-10 segments total.
+3. Every segment time (t1, t2) must be strictly consecutive and cover the whole video.
+4. Keywords must be in ENGLISH and visually concrete (e.g., 'cat sleeping' NOT 'emotional moment').
+5. If the script is about a funny comparison (Expectation vs Reality), ensure the segments align with the transition keywords.
 
-Rules for Relevant Visuals:
-1. All visuals must be relevant to the specific topic in the script.
-2. If the topic is related to India, use only visuals related to India or culturally accurate visuals.
-3. Match every search query with the specific scene in the script (e.g., if a location is mentioned, include that location in the query).
-4. Avoid unrelated international images.
-5. Use only English in your text queries.
-6. Each search string must depict something visual.
-7. The depictions have to be extremely visually concrete, like rainy street, or cat sleeping.
-8. 'emotional moment' <= BAD, because it doesn't depict something visually.
-9. 'crying child' <= GOOD, because it depicts something visual.
-10. The list must always contain the most relevant and appropriate query searches.
-
-Note: Your response should be the response only and no extra text or data.
-  """
+Output ONLY a JSON array: [[[t1, t2], ["keyword1", "keyword2"]], ...]. No extra text.
+"""
 
 def fix_json(json_str):
     # Replace typographical apostrophes with straight quotes
@@ -68,7 +62,7 @@ def getVideoSearchQueriesTimed(script,captions_timed):
             if out:
                 curr = out[0]
                 for i in range(1, len(out)):
-                    if (curr[0][1] - curr[0][0]) < 5.0:
+                    if (curr[0][1] - curr[0][0]) < 3.0:
                         curr[0][1] = out[i][0][1]
                         curr[1] = list(dict.fromkeys(curr[1] + out[i][1]))[:3]
                     else:
@@ -169,33 +163,75 @@ Timed Captions:{}
         return default_json
 
 def merge_empty_intervals(segments):
-    if segments is None:
-        print("No background videos available to merge")
+    """
+    Ensure every segment has a URL by borrowing from neighbors.
+    Also ensures NO timeline gaps exist (100% video coverage).
+    """
+    if not segments:
+        print("No background segments to merge")
         return None
     
-    merged = []
-    i = 0
-    while i < len(segments):
-        interval, url = segments[i]
-        if url is None:
-            # Find consecutive None intervals
-            j = i + 1
-            while j < len(segments) and segments[j][1] is None:
-                j += 1
-            
-            # Merge consecutive None intervals with the previous valid URL
-            if i > 0:
-                prev_interval, prev_url = merged[-1]
-                if prev_url is not None and prev_interval[1] == interval[0]:
-                    merged[-1] = [[prev_interval[0], segments[j-1][0][1]], prev_url]
-                else:
-                    merged.append([interval, prev_url])
-            else:
-                merged.append([interval, None])
-            
-            i = j
-        else:
-            merged.append([interval, url])
-            i += 1
+    # Sort by start time just in case
+    segments.sort(key=lambda x: x[0][0])
     
+    # 1. Timeline Gap Filling & sanitization
+    sanitized = []
+    for i, (interval, url) in enumerate(segments):
+        t1, t2 = interval
+        
+        # If there's a gap between the end of the last segment and the start of this one
+        if i > 0:
+            prev_t2 = sanitized[-1][0][1]
+            if t1 > prev_t2:
+                # Fill the gap by extending the previous segment's end time
+                sanitized[-1][0][1] = t1
+            elif t1 < prev_t2:
+                # Fix overlap
+                t1 = prev_t2
+        
+        # Ensure the first segment starts at 0.0
+        if i == 0 and t1 > 0:
+            t1 = 0.0
+            
+        # Ensure t2 > t1
+        if t2 <= t1:
+            t2 = t1 + 1.0
+            
+        sanitized.append([[t1, t2], url])
+    
+    # 2. Forward Fill: Replace None with the previous valid URL
+    last_valid_url = None
+    for i in range(len(sanitized)):
+        if sanitized[i][1]:
+            last_valid_url = sanitized[i][1]
+        elif last_valid_url:
+            sanitized[i][1] = last_valid_url
+            
+    # 3. Backward Fill: In case the first few are None, fill from the first valid one
+    first_valid_url = None
+    for j in range(len(sanitized)-1, -1, -1):
+        if sanitized[j][1]:
+            first_valid_url = sanitized[j][1]
+        elif first_valid_url:
+            sanitized[j][1] = first_valid_url
+
+    # 4. Global Fallback (Last Resort)
+    if not any(s[1] for s in sanitized):
+        print("CRITICAL: No valid URLs found in any segment. Using fallback placeholder.")
+        placeholder = "https://images.pexels.com/photos/301920/pexels-photo-301920.jpeg"
+        for k in range(len(sanitized)):
+            sanitized[k][1] = placeholder
+
+    # 5. Merge consecutive identical URLs
+    merged = []
+    if sanitized:
+        curr = sanitized[0]
+        for m in range(1, len(sanitized)):
+            if sanitized[m][1] == curr[1]:
+                curr[0][1] = sanitized[m][0][1]
+            else:
+                merged.append(curr)
+                curr = sanitized[m]
+        merged.append(curr)
+        
     return merged

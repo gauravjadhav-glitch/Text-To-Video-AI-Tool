@@ -6,24 +6,25 @@ def clean_markdown(text):
     """Remove markdown formatting from text to prevent TTS issues."""
     import re
     
-    # Remove bold formatting (**text**)
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    
-    # Remove italic formatting (*text* or _text_)
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
-    text = re.sub(r'_(.*?)_', r'\1', text)
-    
-    # Remove code formatting (`text` or ```text```)
-    text = re.sub(r'`(.*?)`', r'\1', text)
+    # 1. Remove triple code blocks first
     text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
     
-    # Remove headers (# text)
+    # 2. Remove inline code
+    text = re.sub(r'`(.*?)`', r'\1', text)
+    
+    # 3. Remove bold formatting (**text**)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    
+    # 4. Remove italic formatting (*text*) - Skip underscores to avoid breaking words like C++_lib
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    
+    # 5. Remove headers (# text)
     text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
     
-    # Remove links [text](url) -> text
+    # 6. Remove links [text](url) -> text
     text = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', text)
     
-    # Clean up extra whitespace
+    # 7. Clean up extra whitespace
     text = re.sub(r'\s+', ' ', text)
     
     return text.strip()
@@ -31,36 +32,46 @@ def clean_markdown(text):
 
 def generate_script(topic, duration=60, mode='shorts'):
     """Generate a script.
-    mode='shorts'      -> YouTube Shorts style (original)
-    mode='documentary' -> Hindi documentary style with hooks, scenes & closing line
+    mode options: 'shorts', 'documentary', 'viral_story', 'facts', 'comparison'
     """
     config = get_config()
     client = config.get_llm_client()
     model = config.get_llm_model()
     provider = config.get_llm_provider()
 
+    word_count = 70 if duration == 30 else 140
+
     if mode == 'documentary':
         prompt = _build_documentary_prompt(duration)
-    else:
-        word_count = 70 if duration == 30 else 140
+    elif mode == 'viral_story':
+        prompt = _build_shorts_prompt(duration, word_count, style="Viral Storytelling / Mystery")
+    elif mode == 'comparison':
+        prompt = _build_shorts_prompt(duration, word_count, style="Funny Comparison (Expectation vs Reality)")
+    elif mode == 'facts':
+        prompt = _build_shorts_prompt(duration, word_count, style="Mind-blowing Facts")
+    else: # Default shorts
         prompt = _build_shorts_prompt(duration, word_count)
 
     if provider == 'gemini':
-        content = _call_gemini(client, topic, prompt)
+        content = _call_gemini_with_retry(client, topic, prompt)
     else:
-        content = _call_openai_groq(client, model, topic, prompt)
+        content = _call_openai_with_retry(client, model, topic, prompt)
 
     return _parse_script_response(content)
 
 
-def _build_shorts_prompt(duration, word_count):
+def _build_shorts_prompt(duration, word_count, style="viral content"):
     return (
-        f"""You are a seasoned content writer for a YouTube Shorts channel, specializing in facts videos. 
-        Your facts shorts are concise, each lasting exactly {duration} seconds (approximately {word_count} words). 
-        They are incredibly engaging and original. When a user requests a specific type of facts short, you will create it.
+        f"""You are a seasoned content writer for a YouTube Shorts channel, specializing in {style}. 
+        Your shorts are concise, lasting exactly {duration} seconds.
+        
+        CRITICAL INSTRUCTIONS:
+        - Write EXACTLY about {word_count} words. 
+        - Do NOT exceed {word_count + 10} words.
+        - Ensure every second is engaging and has a hook.
 
         Important instructions:
-        - All content must be relevant to the specific topic requested.
+        - All content must be relevant to the specific topic or style requested (e.g., if asked for a comparison, follow that style).
         - If the topic is related to a specific country (e.g., India), ensure the facts, cultural context, and tone reflect that accurately.
         - Do not use random or unrelated information.
         - If the script mentions a location, person, or event, it should be described in a way that allows for matching visuals.
@@ -96,7 +107,8 @@ def _build_documentary_prompt(duration):
         - Script directly bolne wali honi chahiye jaise koi narrator bol raha ho
         - Suspense aur emotional tension throughout banaye rakho
         - Strong hooks use karo jo viewer ko last tak roke
-        - Approximately {duration} seconds ki content likho
+        - Write EXACTLY {duration * 2.3:.0f} words in Hindi.
+        - Do NOT exceed {duration * 2.5:.0f} words.
 
         Sirf JSON format mein output do, koi extra text nahi:
         {{"script": "Yahan script likho..."}}
@@ -120,43 +132,64 @@ def _parse_script_response(content):
             raise ValueError("No valid JSON found in response")
 
         script_text = text[json_start:json_end+1]
-        script = json.loads(script_text, strict=False)["script"]
-        script = clean_markdown(script)
+        data = json.loads(script_text, strict=False)
+        
+        if "script" not in data:
+             raise ValueError("Missing 'script' key in JSON response")
+             
+        script = clean_markdown(data["script"])
         return script
     except Exception as e:
         print(f"Error parsing script response: {e}")
         raise
 
 
-def _call_openai_groq(client, model, topic, prompt):
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": topic}
-        ]
-    )
-    return response.choices[0].message.content
+def _call_openai_with_retry(client, model, topic, prompt, retries=3):
+    import time
+    for i in range(retries):
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": topic}
+                ],
+                timeout=30
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            if i == retries - 1:
+                raise RuntimeError(f"OpenAI/Groq request failed after {retries} attempts: {e}")
+            print(f"LLM attempt {i+1} failed, retrying... ({e})")
+            time.sleep(2)
 
 
-def _call_gemini(client, topic, prompt):
-    response = client.generate_content(
-        contents=[
-            {"role": "user", "parts": [{"text": f"{prompt}\n\nTopic: {topic}"}]}
-        ],
-        generation_config={
-            "temperature": 0.7,
-            "top_p": 0.8,
-            "max_output_tokens": 8192,
-        }
-    )
-    text = response.text
-    
-    if text.startswith('```json'):
-        text = text[7:]
-    if text.startswith('```'):
-        text = text[3:]
-    if text.endswith('```'):
-        text = text[:-3]
-    
-    return text.strip()
+def _call_gemini_with_retry(client, topic, prompt, retries=3):
+    import time
+    for i in range(retries):
+        try:
+            response = client.generate_content(
+                contents=[
+                    {"role": "user", "parts": [{"text": f"{prompt}\n\nTopic: {topic}"}]}
+                ],
+                generation_config={
+                    "temperature": 0.7,
+                    "top_p": 0.8,
+                    "max_output_tokens": 8192,
+                }
+            )
+            text = response.text or ""
+            
+            if text.startswith('```json'):
+                text = text[7:]
+            if text.startswith('```'):
+                text = text[3:]
+            if text.endswith('```'):
+                text = text[:-3]
+            
+            return text.strip()
+        except Exception as e:
+            if i == retries - 1:
+                raise RuntimeError(f"Gemini request failed after {retries} attempts: {e}")
+            print(f"Gemini attempt {i+1} failed, retrying... ({e})")
+            time.sleep(2)

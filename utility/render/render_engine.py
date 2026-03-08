@@ -115,7 +115,27 @@ def get_output_media(audio_file_path, timed_captions, background_video_data, vid
                 video_clip = video_clip.set_position("center")
                 visual_clips.append(video_clip)
         except Exception as e:
-            print(f"Error processing segment {t1}-{t2}: {e}")
+            print(f"Error processing segment {t1}-{t2} from URL {url}: {e}")
+    
+    # Check if we successfully added any media clips
+    # (The first clip in visual_clips is always the black background_clip)
+    if len(visual_clips) <= 1:
+        print("WARNING: No visual media clips were successfully processed. Adding global fallback.")
+        try:
+            fallback_url = "https://images.pexels.com/photos/301920/pexels-photo-301920.jpeg"
+            fallback_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
+            download_file(fallback_url, fallback_file)
+            fallback_clip = ImageClip(fallback_file).set_duration(duration).set_position("center")
+            
+            if is_landscape:
+                fallback_clip = fallback_clip.resize(width=1920)
+            else:
+                fallback_clip = fallback_clip.resize(height=1920)
+                
+            visual_clips.append(fallback_clip)
+            downloaded_files.append(fallback_file)
+        except Exception as fe:
+            print(f"Failed to add global fallback: {fe}")
     
     audio_clips = []
     audio_file_clip = AudioFileClip(audio_file_path)
@@ -123,7 +143,14 @@ def get_output_media(audio_file_path, timed_captions, background_video_data, vid
     
     # Only add captions if enabled in config
     if config.get_captions_enabled():
-        for (t1, t2), text in timed_captions:
+        for (t1, t2), raw_text in timed_captions:
+            # Clean text of emojis as TextClip/ImageMagick often fails with them
+            import re as re_mod
+            text = re_mod.sub(r'[^\x00-\x7F]+', '', raw_text).strip()
+            
+            if not text:
+                continue
+
             # Get caption styling from config
             font_size = config.get_caption_font_size()
             font_color = config.get_caption_font_color()

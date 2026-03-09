@@ -70,93 +70,49 @@
                         <!-- Language Choice -->
                         <div class="choice-group" id="language-group">
                             <label><i class="fa-solid fa-language"></i> Video Language</label>
-                            <div class="segmented-control three-way">
+                            <div class="segmented-control three-way"
+                                style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;">
                                 <input type="radio" name="language" value="marathi" id="langMar" checked>
                                 <label for="langMar">Marathi</label>
                                 <input type="radio" name="language" value="english" id="langEng">
                                 <label for="langEng">English</label>
                                 <input type="radio" name="language" value="hindi" id="langHin">
                                 <label for="langHin">Hindi</label>
+                                <input type="radio" name="language" value="english-premium" id="langEngPrem">
+                                <label for="langEngPrem" style="font-size: 0.8rem;">OpenAI Prem</label>
+                                <input type="radio" name="language" value="english-pro" id="langEngPro">
+                                <label for="langEngPro" style="font-size: 0.8rem;">OpenAI Pro</label>
                             </div>
                         </div>
 
                         <!-- Mode Choice (only for Shorts) -->
                         <div class="choice-group" id="mode-group">
                             <label><i class="fa-solid fa-wand-magic-sparkles"></i> Generation Mode</label>
-                            <div class="segmented-control" style="grid-template-columns: 1fr 1fr 1fr;">
+                            <div class="segmented-control">
                                 <input type="radio" name="mode" value="topic" id="modeTopic" checked>
                                 <label for="modeTopic">Auto Script</label>
                                 <input type="radio" name="mode" value="script" id="modeScript">
                                 <label for="modeScript">Paste Script</label>
-                                <input type="radio" name="mode" value="viral" id="modeViral">
-                                <label for="modeViral">🚀 Viral Short</label>
                             </div>
                         </div>
 
-                        <!-- Viral Script Preview Card (shown only in Viral mode) -->
-                        <div class="viral-preview-card hidden" id="viral-preview-card">
-                            <div class="viral-preview-header">
-                                <i class="fa-solid fa-fire-flame-curved"></i>
-                                <span>Viral Script Preview</span>
-                                <button type="button" id="preview-viral-btn" class="mini-btn fetch-ideas-btn">
-                                    <i class="fa-solid fa-bolt"></i> Generate Script
-                                </button>
-                            </div>
-                            <div id="viral-preview-body" class="viral-preview-body">
-                                <p class="ideas-placeholder"><i class="fa-solid fa-lightbulb"></i> Enter a topic above
-                                    and click Generate Script to preview your viral short.</p>
-                            </div>
-                        </div>
-
-                        <!-- Suggest Ideas Dropdown Section -->
-                        <div class="suggest-dropdown">
-                            <button type="button" class="suggest-toggle" id="suggest-toggle-btn">
-                                <span class="suggest-toggle-left">
-                                    <i class="fa-solid fa-fire suggest-fire-icon"></i>
-                                    <span>Suggest Ideas</span>
-                                    <span class="suggest-badge">AI Picks</span>
-                                </span>
-                                <i class="fa-solid fa-chevron-down suggest-chevron" id="suggest-chevron"></i>
-                            </button>
-                            <div class="suggest-panel" id="suggest-panel">
-                                <div class="suggest-panel-inner">
-                                    <div class="niche-row">
-                                        <div class="niche-pills" id="niche-pills">
-                                            <button type="button" class="niche-pill active" data-niche="mystery">🔮
-                                                Mystery</button>
-                                            <button type="button" class="niche-pill" data-niche="facts">⚡ Facts</button>
-                                            <button type="button" class="niche-pill" data-niche="life_hacks">💡 Life
-                                                Hacks</button>
-                                            <button type="button" class="niche-pill" data-niche="history">🏛️
-                                                History</button>
-                                            <button type="button" class="niche-pill" data-niche="ai">🤖 AI &
-                                                Tech</button>
-                                            <button type="button" class="niche-pill" data-niche="motivation">🔥
-                                                Motivation</button>
-                                            <button type="button" class="niche-pill" data-niche="science">🔬
-                                                Science</button>
-                                            <!-- New India Centric Topics -->
-                                            <button type="button" class="niche-pill" data-niche="cricket">🏏
-                                                Cricket</button>
-                                            <button type="button" class="niche-pill" data-niche="bollywood">🎬
-                                                Bollywood</button>
-                                            <button type="button" class="niche-pill" data-niche="politics">🏛️
-                                                Politics</button>
-                                            <button type="button" class="niche-pill" data-niche="spiritual">🕉️
-                                                Spiritual</button>
-                                            <button type="button" class="niche-pill" data-niche="trending_india">📈
-                                                Trending</button>
-                                        </div>
-                                        <button type="button" id="get-viral-btn" class="mini-btn fetch-ideas-btn">
-                                            <i class="fa-solid fa-bolt"></i> Fetch
-                                        </button>
-                                    </div>
-                                    <input type="hidden" id="viral-niche" value="mystery">
-                                    <div id="viral-ideas-list" class="ideas-list">
-                                        <p class="ideas-placeholder"><i class="fa-solid fa-lightbulb"></i> Select a
-                                            category and hit Fetch to get AI-powered topic ideas.</p>
-                                    </div>
+                        <!-- Viral Topic Suggestion -->
+                        <div class="viral-helper">
+                            <div class="helper-header">
+                                <label><i class="fa-solid fa-fire"></i> Suggest Ideas</label>
+                                <div class="niche-selector">
+                                    <select id="viral-niche">
+                                        <option value="mystery">Mystery</option>
+                                        <option value="facts">Facts</option>
+                                        <option value="life_hacks">Life Hacks</option>
+                                        <option value="history">History</option>
+                                        <option value="ai">AI & Tech</option>
+                                    </select>
+                                    <button type="button" id="get-viral-btn" class="mini-btn">Fetch Ideas</button>
                                 </div>
+                            </div>
+                            <div id="viral-ideas-list" class="ideas-list hidden">
+                                <!-- Suggested items here -->
                             </div>
                         </div>
 
@@ -268,12 +224,7 @@
                             <a id="download-btn" class="download-btn" href="#" download>
                                 <i class="fa-solid fa-download"></i> Download Video
                             </a>
-                            <button id="upload-youtube-btn" class="download-btn" type="button"
-                                style="margin-left: 10px;">
-                                <i class="fa-brands fa-youtube"></i> Upload to YouTube
-                            </button>
                         </div>
-                        <p id="upload-status" class="subtitle hidden" style="margin-top: 10px;"></p>
                     </div>
                 </div>
             </div>

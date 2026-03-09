@@ -45,14 +45,19 @@ def generate_viral_topics(niche="mystery", count=10):
     prompt = f"""
     Generate {count} viral YouTube Shorts / Documentary topic ideas in the '{niche}' niche.
     
+    CRITICAL INSTRUCTIONS (INDIA FIRST):
+    - MANDATORY: Every single topic MUST be related to INDIA (Indian people, places, history, culture, or current events).
+    - TARGET AUDIENCE: Indian viewers on YouTube/Instagram.
+    - RECENT TRENDS: Focus on what is currently trending or traditionally 'viral' in India (e.g., specific myths, local news, cricket legends, bollywood secrets, political twists).
+    - HOOK STRATEGY: Use curiosity gaps that work specifically for the Indian audience ("Bharat ka sabse bada rahasya...", "Why Indians are doing X...").
+
     Rules for Virality:
     - High curiosity & click-worthy hooks.
     - Shocking, mysterious, or extremely relatable.
-    - Suitable for 30-60 second Shorts or 1-3 min documentaries.
     - Visual-heavy concepts that are easy to illustrate with AI images.
 
     Output ONLY a JSON object:
-    {{"topics": ["Topic 1 Description", "Topic 2 Description", ...]}}
+    {{"topics": ["Short clickable title: Brief description", ...]}}
     """
     
     return _call_llm_with_retry(client, provider, model, prompt, niche)["topics"]

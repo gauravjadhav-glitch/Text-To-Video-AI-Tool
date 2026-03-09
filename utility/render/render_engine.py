@@ -4,15 +4,12 @@ import tempfile
 import zipfile
 import platform
 import subprocess
-from moviepy.editor import (AudioFileClip, CompositeVideoClip, CompositeAudioClip, ImageClip,
-                              TextClip, VideoFileClip, ColorClip)
-from moviepy.audio.fx.audio_loop import audio_loop
-from moviepy.audio.fx.audio_normalize import audio_normalize
 import requests
 import PIL.Image
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
 from utility.config import get_config
+from utility.render.ffmpeg_render_engine import render_video_ffmpeg
 
 def download_file(url, filename):
     with open(filename, 'wb') as f:
@@ -34,8 +31,33 @@ def get_program_path(program_name):
     return program_path
 
 def get_output_media(audio_file_path, timed_captions, background_video_data, video_server):
+    # Import MoviePy lazily to avoid crashing the web server at startup on some
+    # macOS/Python builds where NumPy initialization can raise a fatal signal.
     config = get_config()
     OUTPUT_FILE_NAME = "rendered_video.mp4"
+
+    # On some macOS setups (notably when Python/NumPy is miscompiled), importing NumPy
+    # can hard-crash the process. Prefer an FFmpeg-only render path when available.
+    force_ffmpeg = os.getenv("RENDER_ENGINE", "").lower() == "ffmpeg"
+    if force_ffmpeg or platform.system() == "Darwin":
+        return render_video_ffmpeg(
+            audio_file_path,
+            timed_captions,
+            background_video_data,
+            output_file_name=OUTPUT_FILE_NAME,
+            orientation_landscape=config.get_video_orientation(),
+            captions_enabled=config.get_captions_enabled(),
+        )
+
+    from moviepy.editor import (
+        AudioFileClip,
+        CompositeVideoClip,
+        CompositeAudioClip,
+        ImageClip,
+        TextClip,
+        VideoFileClip,
+        ColorClip,
+    )
     magick_path = get_program_path("magick")
     print(magick_path)
     if magick_path:

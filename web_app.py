@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from utility.script.script_generator import generate_script
+from utility.script.viral_shorts_generator import generate_viral_short, extract_voiceover_script
 from utility.script.visual_prompt_generator import generate_visual_prompts
 from utility.audio.audio_generator import generate_audio
 from utility.captions.timed_captions_generator import generate_timed_captions
@@ -85,6 +86,7 @@ async def _generate_video_core(
         raise ValueError("Input cannot be empty")
 
     # 1. Generate Script
+    viral_data = None
     if is_documentary:
         print(f"[DOCUMENTARY] Generating script for: {input_text} ({duration}s)")
         response = generate_script(
@@ -94,6 +96,11 @@ async def _generate_video_core(
         )
         print(f"[DOCUMENTARY] Script generated: {response[:100]}...")
         language = "hindi"
+    elif mode == "viral":
+        print(f"[VIRAL] Generating viral Shorts script for: {input_text}")
+        viral_data = generate_viral_short(topic=input_text, duration=duration, language=language)
+        response   = extract_voiceover_script(viral_data)
+        print(f"[VIRAL] Voiceover extracted ({len(response.split())} words): {response[:80]}...")
     elif mode == "topic":
         response = generate_script(
             f"Write a {duration} second script in {language} about: {input_text}",
@@ -163,6 +170,22 @@ async def _generate_video_core(
             search_terms.append([[t_start, t_end], [prompt_text]])
 
         print(f"[DOCUMENTARY] Created {len(search_terms)} segments (~{BLOCK_SECONDS}s each) for images")
+    elif mode == "viral" and viral_data:
+        print("[VIRAL] Mapping AI-generated visual prompts to timed blocks...")
+        # Get total duration from whisper timed_captions
+        # timed_captions format is likely [[ [start, end], text ], ...]
+        # Actually in web_app.py line 152: tc[0][1] if isinstance(tc[0], (list, tuple)) else tc[0]
+        # Let's check line 152 again.
+        total_duration = max(tc[0][1] if isinstance(tc[0], (list, tuple)) else tc[0] for tc in timed_captions)
+        scenes = viral_data.get("scenes", [])
+        num_scenes = len(scenes)
+
+        search_terms = []
+        for i, s in enumerate(scenes):
+            t_start = (i * total_duration) / num_scenes
+            t_end   = ((i + 1) * total_duration) / num_scenes
+            search_terms.append([[t_start, t_end], [s.get("visual_prompt", "viral cinematic scene")]])
+        print(f"[VIRAL] Created {len(search_terms)} scene-based visual prompts")
     else:
         search_terms = getVideoSearchQueriesTimed(response, timed_captions)
 
@@ -333,69 +356,33 @@ async def get_viral_ideas(niche: str = "mystery"):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-
-@app.post("/auto-documentary-upload")
-async def auto_documentary_upload(
-    niche: str = Form("mystery"),
-    duration: int = Form(120),
-    privacy_status: str = Form("public"),
+# ── NEW: Viral Shorts Script Generator ────────────────────────────────────────
+@app.post("/generate-viral-script")
+async def generate_viral_script_endpoint(
+    topic: str = Form(...),
+    duration: int = Form(60),
+    language: str = Form("english"),
 ):
     """
-    One-click pipeline:
-    viral idea -> documentary -> render -> upload to YouTube.
+    Generate a fully structured viral Shorts script (JSON with title, hook,
+    scenes, loop_ending, hashtags) WITHOUT producing a video.
+    Use this to preview/copy the script before running the full pipeline.
     """
     try:
-        from utility.script.viral_engine import generate_viral_topics
-        from utility.video.youtube_uploader import upload_video
-
-        privacy_status = (privacy_status or "public").strip().lower()
-        if privacy_status not in ["private", "unlisted", "public"]:
-            return JSONResponse(
-                {"status": "error", "message": "privacy_status must be private|unlisted|public"},
-                status_code=400,
-            )
-
-        topics = generate_viral_topics(niche, count=5)
-        if not topics:
-            return JSONResponse({"status": "error", "message": "No topics generated"}, status_code=500)
-
-        topic = topics[0]
-
-        gen = await _generate_video_core(
-            input_text=topic,
-            mode="documentary",
-            duration=int(duration),
-            language="hindi",
-            use_ai_images=True,
-            use_stock_images=False,
+        data = await asyncio.to_thread(
+            generate_viral_short, topic, duration, language
         )
-
-        video_path = gen["video_file_path"]
-        title = (topic or "AI Documentary").strip()[:95]
-        description = f"Topic: {topic}\n\nGenerated with AI Video Creator."
-        tags = [niche, "documentary", "ai", "shorts"]
-
-        video_id = await asyncio.to_thread(
-            upload_video,
-            video_path,
-            title,
-            description,
-            tags,
-            "27",
-            privacy_status,
-        )
-
-        return JSONResponse(
-            {
-                "status": "success",
-                "topic": topic,
-                "video_url": f"/download/{video_path}",
-                "script_used": gen["script_used"],
-                "video_id": video_id,
-            }
-        )
+        voiceover = extract_voiceover_script(data)
+        return JSONResponse({
+            "status":    "success",
+            "title":     data.get("title", ""),
+            "hook":      data.get("hook", ""),
+            "scenes":    data.get("scenes", []),
+            "loop_ending": data.get("loop_ending", ""),
+            "hashtags":  data.get("hashtags", []),
+            "voiceover_script": voiceover,
+        })
     except Exception as e:
         import traceback
-
         traceback.print_exc()
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)

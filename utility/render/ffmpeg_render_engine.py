@@ -210,10 +210,10 @@ def render_video_ffmpeg(
             lower = url.lower()
             if any(lower.endswith(x) for x in [".png", ".jpg", ".jpeg", ".webp"]):
                 ext = os.path.splitext(lower)[1]
-            in_path = os.path.join(td, f"seg_{i:03d}{ext}")
+            in_path = os.path.join(td, f"seg_{i:03d}_input{ext}")
             _download(url, in_path)
 
-            out_path = os.path.join(td, f"seg_{i:03d}.mp4")
+            out_path = os.path.join(td, f"seg_{i:03d}_output.mp4")
             if ext == ".mp4":
                 _make_video_clip(in_path, dur, out_path, opts)
             else:

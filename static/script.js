@@ -1,175 +1,71 @@
 // ═══════════════════════════════════════════════════════════════════
-//  VIRAL IDEAS HANDLER
+//  SUGGEST IDEAS DROPDOWN
 // ═══════════════════════════════════════════════════════════════════
-const viralBtn = document.getElementById('get-viral-btn');
-const autoRunBtn = document.getElementById('auto-run-btn');
+
+// -- Toggle open/close --
+const suggestToggleBtn = document.getElementById('suggest-toggle-btn');
+const suggestDropdown = suggestToggleBtn ? suggestToggleBtn.closest('.suggest-dropdown') : null;
+
+if (suggestToggleBtn && suggestDropdown) {
+    suggestToggleBtn.addEventListener('click', () => {
+        suggestDropdown.classList.toggle('open');
+    });
+}
+
+// -- Pill selection (syncs to hidden #viral-niche input) --
+const nichePills = document.querySelectorAll('.niche-pill');
 const viralNiche = document.getElementById('viral-niche');
+
+nichePills.forEach(pill => {
+    pill.addEventListener('click', () => {
+        nichePills.forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        if (viralNiche) viralNiche.value = pill.dataset.niche;
+    });
+});
+
+// -- Fetch Ideas --
+const viralBtn = document.getElementById('get-viral-btn');
 const viralList = document.getElementById('viral-ideas-list');
 
 if (viralBtn) {
     viralBtn.addEventListener('click', async () => {
-        const niche = viralNiche.value;
-        viralBtn.innerText = "Loading...";
+        const niche = viralNiche ? viralNiche.value : 'mystery';
+        viralBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading...';
         viralBtn.disabled = true;
 
         try {
             const response = await fetch(`${API_BASE_URL}/viral-ideas?niche=${niche}`);
             const data = await response.json();
 
-            if (data.status === "success") {
+            if (data.status === "success" && data.topics && data.topics.length) {
                 viralList.innerHTML = '';
                 data.topics.forEach(topic => {
                     const div = document.createElement('div');
                     div.className = 'idea-item';
-                    div.innerText = topic;
+                    div.textContent = topic;
                     div.addEventListener('click', () => {
-                        textarea.value = topic;
-                        viralList.classList.add('hidden');
+                        // textarea may not be defined yet — guard it
+                        const ta = document.getElementById('input_text');
+                        if (ta) ta.value = topic;
+                        // Collapse the dropdown after picking
+                        if (suggestDropdown) suggestDropdown.classList.remove('open');
                     });
                     viralList.appendChild(div);
                 });
-                viralList.classList.remove('hidden');
+            } else {
+                viralList.innerHTML = '<p class="ideas-placeholder"><i class="fa-solid fa-triangle-exclamation"></i> No ideas returned. Try another category.</p>';
             }
         } catch (err) {
             console.error("Failed to fetch viral ideas:", err);
+            viralList.innerHTML = '<p class="ideas-placeholder"><i class="fa-solid fa-wifi"></i> Connection error. Please try again.</p>';
         } finally {
-            viralBtn.innerText = "Fetch Ideas";
+            viralBtn.innerHTML = '<i class="fa-solid fa-bolt"></i> Fetch';
             viralBtn.disabled = false;
         }
     });
 }
 
-// One-click: Idea -> Documentary -> Upload
-if (autoRunBtn) {
-    autoRunBtn.addEventListener('click', async () => {
-        const niche = viralNiche.value;
-        const docDurValEl = document.querySelector('input[name="doc_duration"]:checked');
-        const docDurVal = docDurValEl ? docDurValEl.value : "120";
-
-        const cleanupAutoRunUI = () => {
-            radarBox.classList.remove('active');
-            stepProgress.classList.add('hidden');
-            timerContainer.classList.add('hidden');
-        };
-
-        const showAutoRunError = (message) => {
-            // Hide the overlay/progress UI per UX expectation for failures.
-            statusOverlay.classList.add('hidden');
-            stepProgress.classList.add('hidden');
-            radarBox.classList.remove('active');
-            timerContainer.classList.add('hidden');
-
-            if (uploadStatus) {
-                uploadStatus.classList.remove('hidden');
-                uploadStatus.style.color = "#ef4444";
-                uploadStatus.innerText = message || "Auto run failed.";
-            } else {
-                // Fallback: keep overlay visible if uploadStatus is missing
-                statusOverlay.classList.remove('hidden');
-                statusText.innerText = "Auto Run Failed";
-                statusSubtext.innerText = message || "Auto run failed.";
-                statusSubtext.style.color = "#ef4444";
-            }
-        };
-
-        // Reset UI State (reuse the same overlay)
-        btn.classList.add('loading');
-        btn.disabled = true;
-        autoRunBtn.disabled = true;
-        viralBtn && (viralBtn.disabled = true);
-
-        videoResult.classList.add('hidden');
-        scriptBox.classList.add('hidden');
-        statusOverlay.classList.remove('hidden');
-        radarBox.classList.add('active');
-        timerContainer.classList.remove('hidden');
-        stepProgress.classList.remove('hidden');
-
-        statusSubtext.innerText = "Auto-running: viral idea → documentary → render → YouTube upload.";
-        updateStep(1, "Picking Viral Idea...");
-
-        // Start Timer
-        let startTime = Date.now();
-        let timerInterval = setInterval(() => {
-            let elapsedTime = Date.now() - startTime;
-            let seconds = Math.floor(elapsedTime / 1000);
-            let minutes = Math.floor(seconds / 60);
-            seconds = seconds % 60;
-            timerValue.innerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-        }, 1000);
-
-        // Simulate step progress while waiting
-        const stepTimer = setInterval(() => {
-            const elapsed = (Date.now() - startTime) / 1000;
-            if (elapsed > 3 && elapsed < 20) {
-                updateStep(2, "Writing Documentary Script...");
-                statusSubtext.innerText = "Generating Hindi script + visuals prompts.";
-            } else if (elapsed > 20 && elapsed < 50) {
-                updateStep(3, "Recording Voiceover...");
-                statusSubtext.innerText = "Generating narration and captions.";
-            } else if (elapsed > 50 && elapsed < 90) {
-                updateStep(4, "Assembling Final Video...");
-                statusSubtext.innerText = "Rendering video and preparing upload.";
-            } else if (elapsed > 90) {
-                updateStep(5, "Uploading to YouTube...");
-                statusSubtext.innerText = "OAuth window may open for authorization.";
-            }
-        }, 2000);
-
-        try {
-            const fd = new FormData();
-            fd.append("niche", niche);
-            fd.append("duration", docDurVal);
-            fd.append("privacy_status", "public");
-
-            const res = await fetch(`${API_BASE_URL}/auto-documentary-upload`, { method: "POST", body: fd });
-            const data = await res.json();
-            clearInterval(stepTimer);
-
-            if (res.ok && data.status === "success") {
-                clearInterval(timerInterval);
-                updateStep(5, "Uploaded!");
-                statusSubtext.innerText = `YouTube Video ID: ${data.video_id}`;
-
-                setTimeout(() => {
-                    statusOverlay.classList.add('hidden');
-                    stepProgress.classList.add('hidden');
-                    videoResult.classList.remove('hidden');
-                    finalTimeValue.innerText = timerValue.innerText;
-
-                    if (data.script_used) {
-                        scriptBox.classList.remove('hidden');
-                        scriptUsedText.innerText = data.script_used;
-                    }
-
-                    textarea.value = data.topic || textarea.value;
-                    videoPreview.src = `${API_BASE_URL}${data.video_url}`;
-                    downloadBtn.href = `${API_BASE_URL}${data.video_url}`;
-                    downloadBtn.setAttribute('download', 'rendered_video.mp4');
-
-                    if (uploadStatus) {
-                        uploadStatus.classList.remove('hidden');
-                        uploadStatus.style.color = "#22c55e";
-                        uploadStatus.innerText = `Uploaded! Video ID: ${data.video_id}`;
-                    }
-                }, 800);
-            } else {
-                cleanupAutoRunUI();
-                showAutoRunError(data.message || "Check API keys / OAuth setup.");
-            }
-        } catch (e) {
-            cleanupAutoRunUI();
-            showAutoRunError("Server is unreachable. Please try again.");
-        } finally {
-            clearInterval(stepTimer);
-            clearInterval(timerInterval);
-            btn.classList.remove('loading');
-            btn.disabled = false;
-            autoRunBtn.disabled = false;
-            viralBtn && (viralBtn.disabled = false);
-        }
-    });
-}
 // Production URL (Update this with your actual Render URL if using separate deployment)
 const RENDER_BACKEND_URL = "https://text-to-video-ai-tool.onrender.com";
 
@@ -253,18 +149,145 @@ document.querySelectorAll('input[name="video_type"]').forEach(radio => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-//  DYNAMIC PLACEHOLDER (Shorts mode)
+//  DYNAMIC PLACEHOLDER + VIRAL PREVIEW TOGGLE (Shorts mode)
 // ═══════════════════════════════════════════════════════════════════
+const viralPreviewCard = document.getElementById('viral-preview-card');
+
 modeRadios.forEach(radio => {
     radio.addEventListener('change', (e) => {
         if (typeDoc.checked) return;  // Don't change if in documentary mode
-        if (e.target.value === 'topic') {
+
+        const val = e.target.value;
+
+        // Show/hide viral preview card
+        if (viralPreviewCard) {
+            if (val === 'viral') {
+                viralPreviewCard.classList.remove('hidden');
+            } else {
+                viralPreviewCard.classList.add('hidden');
+            }
+        }
+
+        // Update placeholder and button label
+        if (val === 'topic') {
             textarea.placeholder = "E.g., 5 mind-blowing facts about space in Marathi...";
+            btn.querySelector('.btn-text').innerText = 'Build My Video';
+        } else if (val === 'viral') {
+            textarea.placeholder = "E.g., Jallianwala Bagh Massacre, 3 Bermuda Triangle secrets...";
+            btn.querySelector('.btn-text').innerText = '🚀 Build Viral Short';
         } else {
             textarea.placeholder = "Paste your full 60s script here (Marathi supported)...";
+            btn.querySelector('.btn-text').innerText = 'Build My Video';
         }
     });
 });
+
+// ═══════════════════════════════════════════════════════════════════
+//  VIRAL SCRIPT PREVIEW — Generate Script button
+// ═══════════════════════════════════════════════════════════════════
+const previewViralBtn = document.getElementById('preview-viral-btn');
+const viralPreviewBody = document.getElementById('viral-preview-body');
+
+if (previewViralBtn && viralPreviewBody) {
+    previewViralBtn.addEventListener('click', async () => {
+        const topic = document.getElementById('input_text')?.value?.trim();
+        if (!topic) {
+            viralPreviewBody.innerHTML = '<p class="ideas-placeholder"><i class="fa-solid fa-triangle-exclamation"></i> Please enter a topic first.</p>';
+            return;
+        }
+
+        const language = document.querySelector('input[name="language"]:checked')?.value || 'english';
+        const duration = document.querySelector('input[name="duration"]:checked')?.value || 60;
+
+        // Loading state
+        previewViralBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+        previewViralBtn.disabled = true;
+        viralPreviewBody.innerHTML = '<p class="ideas-placeholder"><i class="fa-solid fa-spinner fa-spin"></i> AI is crafting your viral script…</p>';
+
+        try {
+            const fd = new FormData();
+            fd.append('topic', topic);
+            fd.append('duration', duration);
+            fd.append('language', language);
+
+            const res = await fetch(`${API_BASE_URL}/generate-viral-script`, { method: 'POST', body: fd });
+            const data = await res.json();
+
+            if (res.ok && data.status === 'success') {
+                viralPreviewBody.innerHTML = renderViralPreview(data);
+            } else {
+                viralPreviewBody.innerHTML = `<p class="ideas-placeholder"><i class="fa-solid fa-triangle-exclamation"></i> ${data.message || 'Generation failed.'}</p>`;
+            }
+        } catch (err) {
+            console.error('Viral preview error:', err);
+            viralPreviewBody.innerHTML = '<p class="ideas-placeholder"><i class="fa-solid fa-wifi"></i> Connection error. Please try again.</p>';
+        } finally {
+            previewViralBtn.innerHTML = '<i class="fa-solid fa-bolt"></i> Generate Script';
+            previewViralBtn.disabled = false;
+        }
+    });
+}
+
+/** Render the structured viral JSON into preview-card HTML */
+function renderViralPreview(data) {
+    let html = '';
+
+    // Title
+    if (data.title) {
+        html += `<div class="vp-row">
+            <span class="vp-label">📺 Title</span>
+            <span class="vp-value" style="font-weight:600;color:var(--primary)">${escHtml(data.title)}</span>
+        </div>`;
+    }
+
+    // Hook
+    if (data.hook) {
+        html += `<div class="vp-row">
+            <span class="vp-label">⚡ Hook (first 3s)</span>
+            <span class="vp-value">${escHtml(data.hook)}</span>
+        </div>`;
+    }
+
+    // Scenes
+    if (data.scenes && data.scenes.length) {
+        html += `<div class="vp-label" style="margin-top:0.3rem">🎬 Scenes</div>`;
+        data.scenes.forEach(s => {
+            html += `<div class="vp-scene-block">
+                <span class="vp-scene-num">Scene ${s.scene}</span>
+                <span class="vp-scene-vo">${escHtml(s.voiceover || '')}</span>
+                <span class="vp-scene-vis">🎨 ${escHtml(s.visual_prompt || '')}</span>
+                <span class="vp-scene-cap">${escHtml(s.caption || '')}</span>
+            </div>`;
+        });
+    }
+
+    // Loop Ending
+    if (data.loop_ending) {
+        html += `<div class="vp-row">
+            <span class="vp-label">🔁 Loop Ending</span>
+            <span class="vp-value">${escHtml(data.loop_ending)}</span>
+        </div>`;
+    }
+
+    // Hashtags
+    if (data.hashtags && data.hashtags.length) {
+        const tags = data.hashtags.map(t => `<span class="vp-tag">${escHtml(t)}</span>`).join('');
+        html += `<div class="vp-row">
+            <span class="vp-label"># Hashtags</span>
+            <div class="vp-hashtags">${tags}</div>
+        </div>`;
+    }
+
+    return html || '<p class="ideas-placeholder">No content returned.</p>';
+}
+
+function escHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
 
 // ═══════════════════════════════════════════════════════════════════
 //  MUTUALLY EXCLUSIVE CHECKBOXES

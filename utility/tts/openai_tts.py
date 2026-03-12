@@ -16,7 +16,7 @@ async def generate_audio(text, outputFilename, voice="coral"):
             model="gpt-4o-mini-tts",
             voice=voice.lower(), # OpenAI.fm voices: alloy, ash, ballad, coral, echo, fable, onyx, nova, sage, shimmer, verse
             input=text,
-            response_format="mp3"
+            response_format="wav"
         )
         response.stream_to_file(outputFilename)
     except Exception as e:

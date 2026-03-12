@@ -1,3 +1,10 @@
+// Production URL (Update this with your actual Render URL if using separate deployment)
+const RENDER_BACKEND_URL = "https://text-to-video-ai-tool.onrender.com";
+
+const API_BASE_URL = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ? "http://localhost:8000"
+    : (window.location.origin.includes("vercel.app") ? RENDER_BACKEND_URL : window.location.origin);
+
 // ═══════════════════════════════════════════════════════════════════
 //  SUGGEST IDEAS DROPDOWN
 // ═══════════════════════════════════════════════════════════════════
@@ -65,13 +72,6 @@ if (viralBtn) {
         }
     });
 }
-
-// Production URL (Update this with your actual Render URL if using separate deployment)
-const RENDER_BACKEND_URL = "https://text-to-video-ai-tool.onrender.com";
-
-const API_BASE_URL = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
-    ? "http://localhost:8000"
-    : (window.location.origin.includes("vercel.app") ? RENDER_BACKEND_URL : window.location.origin);
 
 // ═══════════════════════════════════════════════════════════════════
 //  SELECT ELEMENTS

@@ -42,7 +42,9 @@ VOICE_MAP = {
 STT_LANG_MAP = {
     "marathi": "mr",
     "hindi": "hi",
-    "english": "en"
+    "english": "en",
+    "english-premium": "en",
+    "english-pro": "en"
 }
 
 @app.get("/", response_class=HTMLResponse)

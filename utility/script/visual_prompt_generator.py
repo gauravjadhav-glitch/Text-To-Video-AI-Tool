@@ -25,6 +25,75 @@ No extra text outside of the JSON array.
 """
 
 
+VIDEO_SEARCH_SYSTEM = """You are a video search expert. The user will provide documentary script lines (numbered, possibly in Hindi or other languages).
+
+For EACH line, generate 2-3 SHORT English search keywords that would find the BEST matching stock video footage on Pexels/Shutterstock.
+
+CRITICAL RULES:
+1. Keywords must be in ENGLISH only (translate Hindi/Marathi if needed).
+2. Keywords must be visually concrete and specific (e.g., "Krishna temple Vrindavan", "Indian flute player sunset", "ancient Indian palace aerial").
+3. Each keyword should be 2-4 words max — simple search queries, NOT long descriptions.
+4. Keywords must DIRECTLY match what the narration is talking about — if the line mentions a river, search for river footage; if it mentions a battle, search for ancient warriors.
+5. Prefer cinematic, dramatic footage terms: add words like "cinematic", "aerial", "slow motion", "dramatic" when appropriate.
+6. Output ONLY a JSON array:
+[
+  {"line": 1, "keywords": ["keyword1", "keyword2"]},
+  {"line": 2, "keywords": ["keyword1", "keyword2"]},
+  ...
+]
+No extra text outside the JSON array.
+"""
+
+
+def generate_video_search_keywords(script_lines: list[str]) -> list[dict]:
+    """
+    Given script lines (Hindi/English), return Pexels-friendly English search keywords.
+    Returns: [{"line": 1, "keywords": ["keyword1", "keyword2"]}, ...]
+    """
+    config = get_config()
+    client = config.get_llm_client()
+    model = config.get_llm_model()
+    provider = config.get_llm_provider()
+
+    numbered = "\n".join(
+        f"{i+1}. {line.strip()}" for i, line in enumerate(script_lines) if line.strip()
+    )
+
+    user_content = f"Documentary script lines:\n{numbered}"
+
+    if provider == "gemini":
+        response = client.generate_content(
+            contents=[{"role": "user", "parts": [{"text": f"{VIDEO_SEARCH_SYSTEM}\n\n{user_content}"}]}],
+            generation_config={"temperature": 0.7, "top_p": 0.85, "max_output_tokens": 4096},
+        )
+        raw = _strip_code_fences(response.text.strip())
+    else:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": VIDEO_SEARCH_SYSTEM},
+                {"role": "user", "content": user_content},
+            ],
+        )
+        raw = _strip_code_fences(response.choices[0].message.content.strip())
+
+    parsed = _parse_response(raw)
+
+    result = []
+    valid_lines = [l for l in script_lines if l.strip()]
+    for i, line in enumerate(valid_lines):
+        entry = {"line": i + 1, "original": line.strip(), "keywords": []}
+        for p in parsed:
+            if p.get("line") == i + 1:
+                entry["keywords"] = p.get("keywords", [])
+                break
+        if not entry["keywords"]:
+            entry["keywords"] = ["cinematic documentary scene"]
+        result.append(entry)
+
+    return result
+
+
 def generate_visual_prompts(script_lines: list[str]) -> list[dict]:
     """
     Given a list of script lines, return a list of dicts:

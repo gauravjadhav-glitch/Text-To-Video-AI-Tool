@@ -118,12 +118,17 @@ def _build_documentary_prompt(duration):
 
 def _parse_script_response(content):
     """Parse LLM response and extract clean script text."""
+    import re as re_mod
     try:
         text = content
         for prefix in ['content:', 'content =', 'content: ', 'content=']:
             if text.startswith(prefix):
                 text = text[len(prefix):].strip()
                 break
+
+        # Strip markdown code fences
+        text = re_mod.sub(r'^```(?:json)?\s*', '', text.strip())
+        text = re_mod.sub(r'\s*```$', '', text.strip())
 
         json_start = text.find('{')
         json_end = text.rfind('}')
@@ -132,11 +137,36 @@ def _parse_script_response(content):
             raise ValueError("No valid JSON found in response")
 
         script_text = text[json_start:json_end+1]
-        data = json.loads(script_text, strict=False)
-        
+
+        # Try standard JSON parse first
+        try:
+            data = json.loads(script_text, strict=False)
+        except json.JSONDecodeError:
+            # Hindi/Devanagari scripts often have unescaped quotes — extract with regex
+            match = re_mod.search(r'"script"\s*:\s*"(.*)"', script_text, re_mod.DOTALL)
+            if match:
+                raw_script = match.group(1)
+                # Unescape common issues
+                raw_script = raw_script.replace('\\"', '"')
+                data = {"script": raw_script}
+            else:
+                # Last resort: extract everything between first "script": " and the final "
+                inner_start = script_text.find('"script"')
+                if inner_start != -1:
+                    colon_pos = script_text.find(':', inner_start)
+                    quote_start = script_text.find('"', colon_pos + 1)
+                    quote_end = script_text.rfind('"')
+                    if quote_start != -1 and quote_end > quote_start:
+                        raw_script = script_text[quote_start + 1 : quote_end]
+                        data = {"script": raw_script}
+                    else:
+                        raise ValueError("Could not extract script from malformed JSON")
+                else:
+                    raise ValueError("No 'script' key found in malformed JSON")
+
         if "script" not in data:
              raise ValueError("Missing 'script' key in JSON response")
-             
+
         script = clean_markdown(data["script"])
         return script
     except Exception as e:

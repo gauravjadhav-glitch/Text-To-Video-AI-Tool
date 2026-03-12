@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from utility.script.script_generator import generate_script
 from utility.script.viral_shorts_generator import generate_viral_short, extract_voiceover_script
-from utility.script.visual_prompt_generator import generate_visual_prompts
+from utility.script.visual_prompt_generator import generate_visual_prompts, generate_video_search_keywords
 from utility.audio.audio_generator import generate_audio
 from utility.captions.timed_captions_generator import generate_timed_captions
 from utility.video.background_video_generator import generate_video_url
@@ -64,18 +64,20 @@ async def _generate_video_core(
 ):
     SAMPLE_FILE_NAME = "audio_tts_web.wav"
 
-    # Documentary mode always uses AI images
     is_documentary = (mode == "documentary")
 
-    if is_documentary or use_ai_images:
+    # Documentary uses Pexels stock videos for realistic footage
+    if is_documentary:
+        VIDEO_SERVER = "pexel"
+    elif use_ai_images:
         VIDEO_SERVER = "stable_diffusion"
     elif use_stock_images:
         VIDEO_SERVER = "pexels_image"
     else:
         VIDEO_SERVER = "pexel"
 
-    # Check if we should use OpenAI TTS for premium voices
-    if language.lower() in ["english-premium", "english-pro"]:
+    # Use OpenAI TTS for documentary (natural narrator) and premium voices
+    if is_documentary or language.lower() in ["english-premium", "english-pro"]:
         tts_provider_override = "openai"
     else:
         tts_provider_override = None
@@ -98,6 +100,7 @@ async def _generate_video_core(
         )
         print(f"[DOCUMENTARY] Script generated: {response[:100]}...")
         language = "hindi"
+        voice = "onyx"  # Deep, dramatic OpenAI voice for documentary narration
     elif mode == "viral":
         print(f"[VIRAL] Generating viral Shorts script for: {input_text}")
         viral_data = generate_viral_short(topic=input_text, duration=duration, language=language)
@@ -112,7 +115,8 @@ async def _generate_video_core(
         response = input_text
 
     # 2. Get correct voice and STT language
-    voice = VOICE_MAP.get(language.lower(), "mr-IN-AarohiNeural")
+    if not is_documentary:
+        voice = VOICE_MAP.get(language.lower(), "mr-IN-AarohiNeural")
     stt_lang = STT_LANG_MAP.get(language.lower(), "mr")
 
     # 3. Generate Audio
@@ -139,7 +143,7 @@ async def _generate_video_core(
 
     # 5. Create Search Queries / Visual Prompts Map
     if is_documentary:
-        print("[DOCUMENTARY] Generating visual prompts from script...")
+        print("[DOCUMENTARY] Generating video search keywords from script...")
         import re as re_mod
 
         script_sentences = re_mod.split(r"[।\n]+", response)
@@ -155,23 +159,23 @@ async def _generate_video_core(
 
         print(f"[DOCUMENTARY] Script split into {len(script_sentences)} sentence groups")
 
-        visual_prompt_data = generate_visual_prompts(script_sentences)
-        print(f"[DOCUMENTARY] Got {len(visual_prompt_data)} visual prompts")
+        video_keyword_data = generate_video_search_keywords(script_sentences)
+        print(f"[DOCUMENTARY] Got {len(video_keyword_data)} video search keyword sets")
 
         total_duration = max(tc[0][1] if isinstance(tc[0], (list, tuple)) else tc[0] for tc in timed_captions)
         BLOCK_SECONDS = 10.0
         num_blocks = max(1, int(total_duration / BLOCK_SECONDS))
-        num_prompts = len(visual_prompt_data)
+        num_keywords = len(video_keyword_data)
 
         search_terms = []
         for b in range(num_blocks):
             t_start = b * BLOCK_SECONDS
             t_end = min((b + 1) * BLOCK_SECONDS, total_duration)
-            prompt_idx = min(int(b * num_prompts / num_blocks), num_prompts - 1)
-            prompt_text = visual_prompt_data[prompt_idx].get("prompt", "cinematic documentary scene")
-            search_terms.append([[t_start, t_end], [prompt_text]])
+            kw_idx = min(int(b * num_keywords / num_blocks), num_keywords - 1)
+            keywords = video_keyword_data[kw_idx].get("keywords", ["cinematic documentary scene"])
+            search_terms.append([[t_start, t_end], keywords])
 
-        print(f"[DOCUMENTARY] Created {len(search_terms)} segments (~{BLOCK_SECONDS}s each) for images")
+        print(f"[DOCUMENTARY] Created {len(search_terms)} segments (~{BLOCK_SECONDS}s each) for video clips")
     elif mode == "viral" and viral_data:
         print("[VIRAL] Mapping AI-generated visual prompts to timed blocks...")
         # Get total duration from whisper timed_captions

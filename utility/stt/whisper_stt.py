@@ -55,28 +55,34 @@ def interpolateTimeFromDict(word_position, d):
 
 
 def getCaptionsWithTime(whisper_analysis, maxCaptionSize=15, considerPunctuation=False):
-    
+
     CaptionsPairs = []
     last_end = 0
-    
+
+    # First pass: collect all valid word timings
+    raw_words = []
     for segment in whisper_analysis['segments']:
         for word_info in segment['words']:
             clean_word = cleanWord(word_info['text'])
             if clean_word:
-                start = word_info['start']
-                end = word_info['end']
-                
-                # Fix all timestamp issues including multiple words with same end time
-                # Check if there's any problem: zero duration, backwards, or overlap
-                if start >= end or start < last_end or end <= last_end:
-                    # Set start from last_end to ensure sequential order
-                    start = last_end
-                    # Set end slightly forward to ensure minimum duration
-                    end = last_end + 0.3
-                
-                # Update last_end for next word
-                last_end = end
-                
-                CaptionsPairs.append(((start, end), clean_word))
-    
+                raw_words.append((word_info['start'], word_info['end'], clean_word))
+
+    if not raw_words:
+        return CaptionsPairs
+
+    # Calculate average word duration for realistic fallback
+    valid_durations = [end - start for start, end, _ in raw_words if end > start]
+    avg_word_dur = sum(valid_durations) / len(valid_durations) if valid_durations else 0.3
+    # Clamp to reasonable range
+    avg_word_dur = max(0.1, min(avg_word_dur, 1.0))
+
+    for start, end, clean_word in raw_words:
+        # Fix timestamp issues using average word duration instead of fixed 0.3s
+        if start >= end or start < last_end or end <= last_end:
+            start = last_end
+            end = last_end + avg_word_dur
+
+        last_end = end
+        CaptionsPairs.append(((start, end), clean_word))
+
     return CaptionsPairs

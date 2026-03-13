@@ -43,6 +43,7 @@ if (viralBtn) {
 
         try {
             const response = await fetch(`${API_BASE_URL}/viral-ideas?niche=${niche}`);
+            if (!response.ok) throw new Error(`Server error: ${response.status}`);
             const data = await response.json();
 
             if (data.status === "success" && data.topics && data.topics.length) {
@@ -126,8 +127,8 @@ document.querySelectorAll('input[name="video_type"]').forEach(radio => {
         // Hide media options for documentary (always uses AI images)
         mediaOptions.style.display = isDoc ? 'none' : '';
 
-        // Hide language for documentary (always Hindi)
-        languageGroup.style.display = isDoc ? 'none' : '';
+        // Show language for documentary too (user can choose)
+        languageGroup.style.display = '';
 
         // Show/hide documentary info box
         if (isDoc) {
@@ -136,9 +137,8 @@ document.querySelectorAll('input[name="video_type"]').forEach(radio => {
             docInfoBox.classList.add('hidden');
         }
 
-        // For documentary, auto-select Hindi and lock
+        // For documentary, suggest Hindi but allow other languages
         if (isDoc) {
-            document.getElementById('langHin').checked = true;
             textarea.placeholder = "E.g., Jallianwala Bagh Massacre, Battle of Panipat, Partition of India...";
             btn.querySelector('.btn-text').innerText = 'Build Documentary';
         } else {
@@ -362,7 +362,7 @@ form.addEventListener('submit', async function (e) {
     }, 1000);
 
     // Prepare Payload
-    const language = document.querySelector('input[name="language"]:checked').value;
+    const language = document.querySelector('input[name="language"]:checked')?.value || 'marathi';
 
     const formData = new FormData();
     formData.append('input_text', textarea.value);
@@ -370,13 +370,13 @@ form.addEventListener('submit', async function (e) {
 
     if (isDocumentary) {
         formData.append('mode', 'documentary');
-        const docDurVal = document.querySelector('input[name="doc_duration"]:checked').value;
+        const docDurVal = document.querySelector('input[name="doc_duration"]:checked')?.value || '120';
         formData.append('duration', docDurVal);
         formData.append('use_ai_images', true);
         formData.append('use_stock_images', false);
     } else {
-        const duration = document.querySelector('input[name="duration"]:checked').value;
-        const mode = document.querySelector('input[name="mode"]:checked').value;
+        const duration = document.querySelector('input[name="duration"]:checked')?.value || '60';
+        const mode = document.querySelector('input[name="mode"]:checked')?.value || 'topic';
         formData.append('mode', mode);
         formData.append('duration', duration);
         formData.append('use_ai_images', aiCheckbox.checked);

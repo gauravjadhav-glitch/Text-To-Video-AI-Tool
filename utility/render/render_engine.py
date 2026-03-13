@@ -166,10 +166,11 @@ def get_output_media(audio_file_path, timed_captions, background_video_data, vid
     # Only add captions if enabled in config
     if config.get_captions_enabled():
         for (t1, t2), raw_text in timed_captions:
-            # Clean text of emojis as TextClip/ImageMagick often fails with them
+            # Clean text: remove emojis but keep Unicode letters (Hindi/Marathi/etc.)
             import re as re_mod
-            text = re_mod.sub(r'[^\x00-\x7F]+', '', raw_text).strip()
-            
+            # Remove emojis and special symbols but preserve all language scripts
+            text = re_mod.sub(r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF\U00002702-\U000027B0]+', '', raw_text).strip()
+
             if not text:
                 continue
 

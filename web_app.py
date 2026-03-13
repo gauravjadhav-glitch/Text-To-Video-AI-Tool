@@ -1,4 +1,5 @@
 import os
+import uuid
 import asyncio
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
@@ -62,7 +63,9 @@ async def _generate_video_core(
     use_ai_images: bool,
     use_stock_images: bool,
 ):
-    SAMPLE_FILE_NAME = "audio_tts_web.wav"
+    # Use unique filenames per request to prevent race conditions
+    request_id = uuid.uuid4().hex[:8]
+    SAMPLE_FILE_NAME = f"audio_tts_{request_id}.wav"
 
     is_documentary = (mode == "documentary")
 
@@ -92,19 +95,26 @@ async def _generate_video_core(
     # 1. Generate Script
     viral_data = None
     if is_documentary:
-        print(f"[DOCUMENTARY] Generating script for: {input_text} ({duration}s)")
+        print(f"[DOCUMENTARY] Generating script for: {input_text} ({duration}s, lang={language})")
         response = generate_script(
             topic=input_text,
             duration=duration,
             mode="documentary",
         )
         print(f"[DOCUMENTARY] Script generated: {response[:100]}...")
-        language = "hindi"
-        voice = "onyx"  # Deep, dramatic OpenAI voice for documentary narration
+        # Use user-selected language instead of hardcoding Hindi
+        if language.lower() not in VOICE_MAP:
+            language = "hindi"
+        voice = VOICE_MAP.get(language.lower(), "hi-IN-MadhurNeural")
+        # Use OpenAI voice for documentary if using OpenAI TTS
+        if tts_provider_override == "openai":
+            voice = "onyx"
     elif mode == "viral":
         print(f"[VIRAL] Generating viral Shorts script for: {input_text}")
         viral_data = generate_viral_short(topic=input_text, duration=duration, language=language)
         response   = extract_voiceover_script(viral_data)
+        if not response or not response.strip():
+            raise ValueError("Failed to extract voiceover script from viral data")
         print(f"[VIRAL] Voiceover extracted ({len(response.split())} words): {response[:80]}...")
     elif mode == "topic":
         response = generate_script(
@@ -113,6 +123,9 @@ async def _generate_video_core(
         )
     else:
         response = input_text
+
+    if not response or not response.strip():
+        raise ValueError("Script generation returned empty content")
 
     # 2. Get correct voice and STT language
     if not is_documentary:
@@ -128,25 +141,44 @@ async def _generate_video_core(
         finally:
             if original_provider:
                 os.environ["TTS_PROVIDER"] = original_provider
+            else:
+                os.environ.pop("TTS_PROVIDER", None)
     else:
         await generate_audio(response, SAMPLE_FILE_NAME, voice=voice)
 
-    # 4. Extract Timed Captions (passing the correct language to Whisper)
+    # 3b. Get actual audio duration for accurate video segment timing
+    import subprocess as _sp
+    try:
+        _probe = _sp.run(
+            ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+             "-of", "csv=p=0", SAMPLE_FILE_NAME],
+            capture_output=True, text=True, timeout=10
+        )
+        actual_audio_duration = float(_probe.stdout.strip())
+        print(f"[AUDIO] Actual audio duration: {actual_audio_duration:.2f}s")
+    except Exception:
+        actual_audio_duration = None
+        print("[AUDIO] Could not probe audio duration, will use caption timing")
+
+    # 4. Extract Timed Captions (use transcribe, NOT translate, to keep original language)
     from utility.stt.whisper_stt import generate_timed_captions as whisper_stt
 
-    if is_documentary:
-        timed_captions = whisper_stt(
-            SAMPLE_FILE_NAME, model_size="tiny", language=stt_lang, task="translate"
-        )
-    else:
-        timed_captions = whisper_stt(SAMPLE_FILE_NAME, model_size="tiny", language=stt_lang)
+    timed_captions = whisper_stt(SAMPLE_FILE_NAME, model_size="tiny", language=stt_lang)
+
+    if not timed_captions:
+        raise RuntimeError("Speech-to-text returned no captions")
+
+    # 4b. Determine total duration — prefer actual audio duration over caption timing
+    caption_end = max(tc[0][1] if isinstance(tc[0], (list, tuple)) else tc[0] for tc in timed_captions)
+    total_duration = actual_audio_duration if actual_audio_duration else caption_end
+    print(f"[TIMING] Using total_duration={total_duration:.2f}s (audio={actual_audio_duration}, caption_end={caption_end:.2f})")
 
     # 5. Create Search Queries / Visual Prompts Map
     if is_documentary:
         print("[DOCUMENTARY] Generating video search keywords from script...")
         import re as re_mod
 
-        script_sentences = re_mod.split(r"[।\n]+", response)
+        script_sentences = re_mod.split(r"[।\n.!?]+", response)
         script_sentences = [s.strip() for s in script_sentences if s.strip() and len(s.strip()) > 10]
 
         if len(script_sentences) > 12:
@@ -162,36 +194,40 @@ async def _generate_video_core(
         video_keyword_data = generate_video_search_keywords(script_sentences)
         print(f"[DOCUMENTARY] Got {len(video_keyword_data)} video search keyword sets")
 
-        total_duration = max(tc[0][1] if isinstance(tc[0], (list, tuple)) else tc[0] for tc in timed_captions)
-        BLOCK_SECONDS = 10.0
-        num_blocks = max(1, int(total_duration / BLOCK_SECONDS))
         num_keywords = len(video_keyword_data)
 
+        # Distribute keywords proportionally across audio duration
+        # Each keyword group gets an equal share of audio time
         search_terms = []
-        for b in range(num_blocks):
-            t_start = b * BLOCK_SECONDS
-            t_end = min((b + 1) * BLOCK_SECONDS, total_duration)
-            kw_idx = min(int(b * num_keywords / num_blocks), num_keywords - 1)
-            keywords = video_keyword_data[kw_idx].get("keywords", ["cinematic documentary scene"])
+        for idx in range(num_keywords):
+            t_start = (idx * total_duration) / num_keywords
+            t_end = ((idx + 1) * total_duration) / num_keywords
+            keywords = video_keyword_data[idx].get("keywords", ["cinematic documentary scene"])
             search_terms.append([[t_start, t_end], keywords])
 
-        print(f"[DOCUMENTARY] Created {len(search_terms)} segments (~{BLOCK_SECONDS}s each) for video clips")
+        print(f"[DOCUMENTARY] Created {len(search_terms)} segments aligned to script sections")
     elif mode == "viral" and viral_data:
         print("[VIRAL] Mapping AI-generated visual prompts to timed blocks...")
-        # Get total duration from whisper timed_captions
-        # timed_captions format is likely [[ [start, end], text ], ...]
-        # Actually in web_app.py line 152: tc[0][1] if isinstance(tc[0], (list, tuple)) else tc[0]
-        # Let's check line 152 again.
-        total_duration = max(tc[0][1] if isinstance(tc[0], (list, tuple)) else tc[0] for tc in timed_captions)
         scenes = viral_data.get("scenes", [])
-        num_scenes = len(scenes)
+        num_scenes = len(scenes) if scenes else 1
+
+        # Calculate word counts per scene to proportionally allocate time
+        scene_word_counts = []
+        for s in scenes:
+            vo = s.get("voiceover", "")
+            scene_word_counts.append(max(len(vo.split()), 1))
+        total_words = sum(scene_word_counts)
 
         search_terms = []
+        t_cursor = 0.0
         for i, s in enumerate(scenes):
-            t_start = (i * total_duration) / num_scenes
-            t_end   = ((i + 1) * total_duration) / num_scenes
-            search_terms.append([[t_start, t_end], [s.get("visual_prompt", "viral cinematic scene")]])
-        print(f"[VIRAL] Created {len(search_terms)} scene-based visual prompts")
+            proportion = scene_word_counts[i] / total_words
+            t_end = t_cursor + (proportion * total_duration)
+            if i == len(scenes) - 1:
+                t_end = total_duration  # Ensure last scene covers to end
+            search_terms.append([[t_cursor, t_end], [s.get("visual_prompt", "viral cinematic scene")]])
+            t_cursor = t_end
+        print(f"[VIRAL] Created {len(search_terms)} scene-based visual prompts (word-proportional)")
     else:
         search_terms = getVideoSearchQueriesTimed(response, timed_captions)
 
@@ -210,6 +246,13 @@ async def _generate_video_core(
         raise RuntimeError("No background videos/images generated.")
 
     video_file_path = get_output_media(SAMPLE_FILE_NAME, timed_captions, background_video_urls, VIDEO_SERVER)
+
+    # Cleanup request-specific audio file
+    try:
+        os.remove(SAMPLE_FILE_NAME)
+    except Exception:
+        pass
+
     return {
         "video_file_path": video_file_path,
         "script_used": response,

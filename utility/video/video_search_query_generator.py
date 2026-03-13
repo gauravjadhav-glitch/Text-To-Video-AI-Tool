@@ -4,16 +4,18 @@ from utility.config import get_config
 from utility.utils import log_response, LOG_TYPE_GPT
 
 prompt = """# Instructions
-Given the following video script and timed captions, extract exactly THREE visually concrete keywords/segments for every 10 seconds of video.
+Given the following video script and timed captions, extract exactly THREE visually concrete keywords/segments for every 5-8 seconds of video.
 
 IMPORTANT RULES:
 1. Each visual segment MUST be at least 3.0 seconds long. NEVER create segments like [[1.0, 1.2]].
-2. For a 30-second video, you should return roughly 6-10 segments total.
-3. Every segment time (t1, t2) must be strictly consecutive and cover the whole video.
-4. Keywords must be in ENGLISH and visually concrete (e.g., 'cat sleeping' NOT 'emotional moment').
-5. If the script is about a funny comparison (Expectation vs Reality), ensure the segments align with the transition keywords.
+2. The FIRST segment MUST start at 0.0 seconds.
+3. The LAST segment MUST end at EXACTLY the end time provided (the total video duration).
+4. Every segment time (t1, t2) must be strictly consecutive with NO gaps — t2 of one segment equals t1 of the next.
+5. Segments must cover the ENTIRE video from 0.0 to the end time. Do NOT stop early.
+6. Keywords must be in ENGLISH and visually concrete (e.g., 'cat sleeping' NOT 'emotional moment').
+7. If the script is about a funny comparison (Expectation vs Reality), ensure the segments align with the transition keywords.
 
-Output ONLY a JSON array: [[[t1, t2], ["keyword1", "keyword2"]], ...]. No extra text.
+Output ONLY a JSON array: [[[t1, t2], ["keyword1", "keyword2", "keyword3"]], ...]. No extra text.
 """
 
 def fix_json(json_str):
@@ -29,16 +31,16 @@ def getVideoSearchQueriesTimed(script,captions_timed):
     end = captions_timed[-1][0][1]
     max_retries = 3
     retry_count = 0
-    
+
     try:
         out = [[[0,0],""]]
-        while out[-1][0][1] != end:
+        while True:
             if retry_count >= max_retries:
                 print(f"Max retries ({max_retries}) reached. Using current result or fallback.")
                 if out == [[[0,0],""]]:
                     return None
-                return out
-            
+                break
+
             content = call_OpenAI(script,captions_timed)
             try:
                 out = json.loads(content, strict=False)
@@ -52,28 +54,43 @@ def getVideoSearchQueriesTimed(script,captions_timed):
                     print(f"Failed to fix JSON: {e2}")
                     retry_count += 1
                     continue
-            
-            if out[-1][0][1] != end:
+
+            if not out or not isinstance(out, list) or len(out) == 0:
                 retry_count += 1
                 continue
 
-            # Merge segments shorter than 5s
+            # Accept if last segment ends within 3 seconds of actual end
+            last_end = out[-1][0][1]
+            if abs(last_end - end) <= 3.0 or last_end >= end * 0.8:
+                break
+            else:
+                print(f"[SEARCH] Segments end at {last_end:.1f}s but audio ends at {end:.1f}s, retrying...")
+                retry_count += 1
+                continue
+
+        # Fix the timeline: ensure first segment starts at 0 and last ends at actual end
+        if out and out != [[[0,0],""]]:
+            out[0][0][0] = 0.0
+            out[-1][0][1] = end
+
+            # Merge segments shorter than 3s
             merged = []
-            if out:
-                curr = out[0]
-                for i in range(1, len(out)):
-                    if (curr[0][1] - curr[0][0]) < 3.0:
-                        curr[0][1] = out[i][0][1]
+            curr = out[0]
+            for i in range(1, len(out)):
+                if (curr[0][1] - curr[0][0]) < 3.0:
+                    curr[0][1] = out[i][0][1]
+                    if isinstance(curr[1], list) and isinstance(out[i][1], list):
                         curr[1] = list(dict.fromkeys(curr[1] + out[i][1]))[:3]
-                    else:
-                        merged.append(curr)
-                        curr = out[i]
-                merged.append(curr)
+                else:
+                    merged.append(curr)
+                    curr = out[i]
+            merged.append(curr)
             return merged
+
         return out
     except Exception as e:
         print("error in response",e)
-   
+
     return None
 
 def call_OpenAI(script,captions_timed):
@@ -82,9 +99,11 @@ def call_OpenAI(script,captions_timed):
     model = config.get_llm_model()
     provider = config.get_llm_provider()
     
+    end_time = captions_timed[-1][0][1] if captions_timed else 30.0
     user_content = """Script: {}
+Total Video Duration: {:.1f} seconds (segments MUST cover from 0.0 to {:.1f})
 Timed Captions:{}
-""".format(script,"".join(map(str,captions_timed)))
+""".format(script, end_time, end_time, "".join(map(str,captions_timed)))
     print("Content", user_content)
     
     if provider == 'gemini':

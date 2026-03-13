@@ -39,7 +39,8 @@ def generate_script(topic, duration=60, mode='shorts'):
     model = config.get_llm_model()
     provider = config.get_llm_provider()
 
-    word_count = 70 if duration == 30 else 140
+    # ~2.5 words/second for natural speech pacing
+    word_count = int(duration * 2.5)
 
     if mode == 'documentary':
         prompt = _build_documentary_prompt(duration)

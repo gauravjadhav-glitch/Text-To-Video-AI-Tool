@@ -2,7 +2,7 @@ import os
 import requests
 from utility.utils import log_response,LOG_TYPE_PEXEL
 from utility.config import get_config
-from utility.video.image_generator import get_images_for_video
+
 
 def search_photos(query_string, orientation_landscape=True):
     config = get_config()
@@ -23,6 +23,7 @@ def search_photos(query_string, orientation_landscape=True):
     return response.json()
 
 def getBestPhoto(query_string, orientation_landscape=True):
+    query_string = _clean_query(query_string)
     data = search_photos(query_string, orientation_landscape)
     if 'photos' in data and data['photos']:
         # Extract the highest resolution link
@@ -63,11 +64,24 @@ def search_videos(query_string, orientation_landscape=True):
 
     return json_data
 
+def _clean_query(query_string, max_words=8):
+    """Truncate query to max_words simple English words for Pexels API compatibility."""
+    import re
+    # Strip non-alphanumeric chars (keep spaces)
+    clean = re.sub(r'[^a-zA-Z0-9\s]', '', query_string)
+    words = clean.split()[:max_words]
+    return " ".join(words).strip() or "cinematic video"
+
 def getBestVideo(query_string, orientation_landscape=True, used_vids=None):
     if used_vids is None:
         used_vids = []
-    vids = search_videos(query_string, orientation_landscape)
-    videos = vids['videos']  # Extract the videos list from JSON
+    query_string = _clean_query(query_string)
+    try:
+        vids = search_videos(query_string, orientation_landscape)
+    except Exception as e:
+        print(f"Pexels video search failed for '{query_string}': {e}")
+        return None
+    videos = vids.get('videos', [])
 
     # Filter and extract videos based on orientation
     if orientation_landscape:
@@ -121,6 +135,7 @@ async def generate_video_url(timed_video_searches, video_server, orientation_lan
                     break
             timed_video_urls.append([[t1, t2], url])
     elif video_server == "stable_diffusion":
+        from utility.video.image_generator import get_images_for_video
         timed_video_urls = await get_images_for_video(timed_video_searches, orientation_landscape=orientation_landscape)
     elif video_server == "pexels_image":
         for (t1, t2), search_terms in timed_video_searches:

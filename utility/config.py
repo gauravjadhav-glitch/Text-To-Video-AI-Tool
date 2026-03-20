@@ -89,31 +89,7 @@ class Config:
         if not os.getenv('PEXELS_API_KEY'):
             errors.append("Missing required API key: PEXELS_API_KEY (always required)")
         
-        stt_provider = os.getenv('STT_PROVIDER', '').lower()
-        if stt_provider not in ['whisper', 'deepgram']:
-            errors.append(
-                f"Invalid STT_PROVIDER: '{stt_provider}'. Must be one of: whisper, deepgram"
-            )
-        elif stt_provider == 'deepgram':
-            if not os.getenv('DEEPGRAM_API_KEY'):
-                errors.append("Missing required API key: DEEPGRAM_API_KEY (required for STT_PROVIDER=deepgram)")
-        
-        tts_provider = os.getenv('TTS_PROVIDER', '').lower()
-        if tts_provider not in ['edgetts', 'elevenlabs', 'openai']:
-            errors.append(
-                f"Invalid TTS_PROVIDER: '{tts_provider}'. Must be one of: edgetts, elevenlabs, openai"
-            )
-        elif tts_provider == 'openai':
-            if not os.getenv('OPENAI_API_KEY'):
-                errors.append("Missing required API key: OPENAI_API_KEY (required for TTS_PROVIDER=openai)")
-        elif tts_provider == 'edgetts':
-            if not os.getenv('EDGETTS_VOICE'):
-                errors.append("Missing required configuration: EDGETTS_VOICE (required for TTS_PROVIDER=edgetts)")
-        elif tts_provider == 'elevenlabs':
-            if not os.getenv('ELEVENLABS_API_KEY'):
-                errors.append("Missing required API key: ELEVENLABS_API_KEY (required for TTS_PROVIDER=elevenlabs)")
-            if not os.getenv('ELEVENLABS_VOICE_ID'):
-                errors.append("Missing required configuration: ELEVENLABS_VOICE_ID (required for TTS_PROVIDER=elevenlabs)")
+
         
         if errors:
             error_message = "Configuration validation failed:\n\n"

@@ -26,6 +26,7 @@ def _run(cmd: List[str]) -> None:
 
 def _download(url: str, out_path: str) -> None:
     # Using curl for reliability + redirects.
+    print(f"[DOWNLOAD] Downloading: {url}")
     _run(["curl", "-L", "-o", out_path, url])
 
 
@@ -59,33 +60,30 @@ def _write_srt(captions: Iterable[TimedCaption], out_path: str) -> None:
 
 
 def _make_image_clip(img_path: str, duration: float, out_path: str, opts: RenderOptions) -> None:
-    # Cover-style scale + center crop to exact size.
+    fps = opts.fps
+    frames = int(max(0.1, float(duration)) * fps)
+    
+    # Cinematic Ken Burns "zoom and pan" fake video animation
+    # Zoom starts at 1 and slowly increases, cropping to exact size
     vf = (
-        f"scale={opts.width}:{opts.height}:force_original_aspect_ratio=increase,"
+        f"scale={opts.width*2}:{opts.height*2},"  # Scale up first to prevent pixelation on zoom
+        f"zoompan=z='min(zoom+0.0015,1.5)':d={frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={opts.width}x{opts.height},"
         f"crop={opts.width}:{opts.height}"
     )
+    
     _run(
         [
             "ffmpeg",
             "-y",
-            "-loop",
-            "1",
-            "-i",
-            img_path,
-            "-t",
-            str(max(0.1, float(duration))),
-            "-r",
-            str(opts.fps),
-            "-vf",
-            vf,
-            "-pix_fmt",
-            "yuv420p",
-            "-c:v",
-            "libx264",
-            "-preset",
-            opts.preset,
-            "-crf",
-            str(opts.crf),
+            "-loop", "1",
+            "-i", img_path,
+            "-t", str(max(0.1, float(duration))),
+            "-r", str(fps),
+            "-vf", vf,
+            "-pix_fmt", "yuv420p",
+            "-c:v", "libx264",
+            "-preset", opts.preset,
+            "-crf", str(opts.crf),
             out_path,
         ]
     )
@@ -156,7 +154,7 @@ def _concat_mp4s(mp4_paths: List[str], out_path: str) -> None:
 
 
 def _escape_ffmpeg_filter_path(path: str) -> str:
-    """
+    r"""
     Escape a filesystem path for use inside an FFmpeg filter argument.
 
     Notes:
@@ -205,11 +203,11 @@ def render_video_ffmpeg(
             if dur <= 0:
                 continue
 
-            # Download media
+            # Download media — strip query params before checking extension
             ext = ".mp4"
-            lower = url.lower()
-            if any(lower.endswith(x) for x in [".png", ".jpg", ".jpeg", ".webp"]):
-                ext = os.path.splitext(lower)[1]
+            url_path = url.split("?")[0].lower()
+            if any(url_path.endswith(x) for x in [".png", ".jpg", ".jpeg", ".webp"]):
+                ext = os.path.splitext(url_path)[1]
             in_path = os.path.join(td, f"seg_{i:03d}_input{ext}")
             _download(url, in_path)
 
@@ -227,7 +225,10 @@ def render_video_ffmpeg(
         _concat_mp4s(segment_mp4s, concat_path)
 
         # Add audio + optional subtitles (burn-in)
-        final_cmd = ["ffmpeg", "-y", "-i", concat_path, "-i", audio_file_path]
+        final_cmd = ["ffmpeg", "-y", "-i", concat_path]
+        if audio_file_path:
+            final_cmd += ["-i", audio_file_path]
+
         vf_filters: List[str] = []
 
         srt_path = os.path.join(td, "captions.srt")
@@ -247,12 +248,13 @@ def render_video_ffmpeg(
             "-crf",
             str(opts.crf),
             "-pix_fmt",
-            "yuv420p",
-            "-c:a",
-            "aac",
-            "-shortest",
-            output_file_name,
+            "yuv420p"
         ]
+        
+        if audio_file_path:
+            final_cmd += ["-c:a", "aac", "-shortest"]
+
+        final_cmd += [output_file_name]
         _run(final_cmd)
 
     return output_file_name

@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="/static/styles.css">
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/script.js" defer></script>
 </head>
 
 <body>
@@ -35,160 +36,40 @@
                     </div>
                     <form id="generate-form">
 
-                        <!-- VIDEO TYPE: Shorts vs Documentary -->
+                        <!-- INPUT TYPE: Direct Script vs Simple Description -->
                         <div class="choice-group">
-                            <label><i class="fa-solid fa-video"></i> Video Type</label>
+                            <label><i class="fa-solid fa-pen-nib"></i> Input Type</label>
                             <div class="segmented-control">
-                                <input type="radio" name="video_type" value="shorts" id="typeShorts" checked>
-                                <label for="typeShorts">⚡ Shorts</label>
-                                <input type="radio" name="video_type" value="documentary" id="typeDoc">
-                                <label for="typeDoc">🎬 Documentary</label>
+                                <input type="radio" name="input_type" value="simple" id="typeSimple" checked>
+                                <label for="typeSimple">✨ Simple Description</label>
+                                <input type="radio" name="input_type" value="direct" id="typeDirect">
+                                <label for="typeDirect">📝 Direct Script</label>
                             </div>
                         </div>
 
-                        <!-- Duration Choice (changes based on type) -->
+                        <!-- Duration Choice -->
                         <div class="choice-group" id="duration-group">
                             <label><i class="fa-regular fa-clock"></i> Video Duration</label>
-                            <!-- Shorts durations -->
-                            <div class="segmented-control" id="shorts-duration">
-                                <input type="radio" name="duration" value="30" id="dur30">
-                                <label for="dur30">30 Seconds</label>
-                                <input type="radio" name="duration" value="60" id="dur60" checked>
-                                <label for="dur60">60 Seconds</label>
-                            </div>
-                            <!-- Documentary durations (hidden by default) -->
-                            <div class="segmented-control" id="doc-duration" style="display:none;">
-                                <input type="radio" name="doc_duration" value="60" id="docDur60">
-                                <label for="docDur60">1 Min</label>
-                                <input type="radio" name="doc_duration" value="120" id="docDur120" checked>
-                                <label for="docDur120">2 Min</label>
-                                <input type="radio" name="doc_duration" value="180" id="docDur180">
-                                <label for="docDur180">3 Min</label>
-                            </div>
-                        </div>
-
-                        <!-- Language Choice -->
-                        <div class="choice-group" id="language-group">
-                            <label><i class="fa-solid fa-language"></i> Video Language</label>
-                            <div class="segmented-control three-way">
-                                <input type="radio" name="language" value="marathi" id="langMar" checked>
-                                <label for="langMar">Marathi</label>
-                                <input type="radio" name="language" value="english" id="langEng">
-                                <label for="langEng">English</label>
-                                <input type="radio" name="language" value="hindi" id="langHin">
-                                <label for="langHin">Hindi</label>
-                            </div>
-                        </div>
-
-                        <!-- Mode Choice (only for Shorts) -->
-                        <div class="choice-group" id="mode-group">
-                            <label><i class="fa-solid fa-wand-magic-sparkles"></i> Generation Mode</label>
-                            <div class="segmented-control" style="grid-template-columns: 1fr 1fr 1fr;">
-                                <input type="radio" name="mode" value="topic" id="modeTopic" checked>
-                                <label for="modeTopic">Auto Script</label>
-                                <input type="radio" name="mode" value="script" id="modeScript">
-                                <label for="modeScript">Paste Script</label>
-                                <input type="radio" name="mode" value="viral" id="modeViral">
-                                <label for="modeViral">🚀 Viral Short</label>
-                            </div>
-                        </div>
-
-                        <!-- Viral Script Preview Card (shown only in Viral mode) -->
-                        <div class="viral-preview-card hidden" id="viral-preview-card">
-                            <div class="viral-preview-header">
-                                <i class="fa-solid fa-fire-flame-curved"></i>
-                                <span>Viral Script Preview</span>
-                                <button type="button" id="preview-viral-btn" class="mini-btn fetch-ideas-btn">
-                                    <i class="fa-solid fa-bolt"></i> Generate Script
-                                </button>
-                            </div>
-                            <div id="viral-preview-body" class="viral-preview-body">
-                                <p class="ideas-placeholder"><i class="fa-solid fa-lightbulb"></i> Enter a topic above
-                                    and click Generate Script to preview your viral short.</p>
-                            </div>
-                        </div>
-
-                        <!-- Suggest Ideas Dropdown Section -->
-                        <div class="suggest-dropdown">
-                            <button type="button" class="suggest-toggle" id="suggest-toggle-btn">
-                                <span class="suggest-toggle-left">
-                                    <i class="fa-solid fa-fire suggest-fire-icon"></i>
-                                    <span>Suggest Ideas</span>
-                                    <span class="suggest-badge">AI Picks</span>
-                                </span>
-                                <i class="fa-solid fa-chevron-down suggest-chevron" id="suggest-chevron"></i>
-                            </button>
-                            <div class="suggest-panel" id="suggest-panel">
-                                <div class="suggest-panel-inner">
-                                    <div class="niche-row">
-                                        <div class="niche-pills" id="niche-pills">
-                                            <button type="button" class="niche-pill active" data-niche="mystery">🔮
-                                                Mystery</button>
-                                            <button type="button" class="niche-pill" data-niche="facts">⚡ Facts</button>
-                                            <button type="button" class="niche-pill" data-niche="life_hacks">💡 Life
-                                                Hacks</button>
-                                            <button type="button" class="niche-pill" data-niche="history">🏛️
-                                                History</button>
-                                            <button type="button" class="niche-pill" data-niche="ai">🤖 AI &
-                                                Tech</button>
-                                            <button type="button" class="niche-pill" data-niche="motivation">🔥
-                                                Motivation</button>
-                                            <button type="button" class="niche-pill" data-niche="science">🔬
-                                                Science</button>
-                                            <!-- New India Centric Topics -->
-                                            <button type="button" class="niche-pill" data-niche="cricket">🏏
-                                                Cricket</button>
-                                            <button type="button" class="niche-pill" data-niche="bollywood">🎬
-                                                Bollywood</button>
-                                            <button type="button" class="niche-pill" data-niche="politics">🏛️
-                                                Politics</button>
-                                            <button type="button" class="niche-pill" data-niche="spiritual">🕉️
-                                                Spiritual</button>
-                                            <button type="button" class="niche-pill" data-niche="trending_india">📈
-                                                Trending</button>
-                                        </div>
-                                        <button type="button" id="get-viral-btn" class="mini-btn fetch-ideas-btn">
-                                            <i class="fa-solid fa-bolt"></i> Fetch
-                                        </button>
-                                    </div>
-                                    <input type="hidden" id="viral-niche" value="mystery">
-                                    <div id="viral-ideas-list" class="ideas-list">
-                                        <p class="ideas-placeholder"><i class="fa-solid fa-lightbulb"></i> Select a
-                                            category and hit Fetch to get AI-powered topic ideas.</p>
-                                    </div>
-                                </div>
+                            <div class="segmented-control three-way" id="shorts-duration">
+                                <input type="radio" name="duration" value="10" id="dur10">
+                                <label for="dur10">10s</label>
+                                <input type="radio" name="duration" value="30" id="dur30" checked>
+                                <label for="dur30">30s</label>
+                                <input type="radio" name="duration" value="60" id="dur60">
+                                <label for="dur60">60s</label>
                             </div>
                         </div>
 
                         <!-- Content Input -->
                         <div class="textarea-wrapper">
                             <textarea id="input_text" name="input_text" required
-                                placeholder="E.g., Marathi facts about Indian kings..."></textarea>
+                                placeholder="E.g., A rainy night in a futuristic city with flying cars..."></textarea>
                         </div>
 
-                        <!-- Documentary info box (hidden by default) -->
-                        <div class="info-box hidden" id="doc-info-box">
+                        <!-- Info box for simple mode -->
+                        <div class="info-box" id="doc-info-box">
                             <i class="fa-solid fa-circle-info"></i>
-                            <span>Sirf topic likho — AI automatically <strong>Hindi Script (Hook → Scenes → Closing
-                                    Line)</strong>
-                                + <strong>Cinematic Visuals</strong> generate karega aur directly video banayega!</span>
-                        </div>
-
-                        <!-- Media Source Option (only for Shorts) -->
-                        <div class="options-container" id="media-options">
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="use_ai_images" name="use_ai_images">
-                                <span class="slider round"></span>
-                                <span class="label-text"><i class="fa-solid fa-paintbrush"></i> Use DALL-E AI
-                                    Images (Slow)</span>
-                            </label>
-
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="use_stock_images" name="use_stock_images">
-                                <span class="slider round"></span>
-                                <span class="label-text"><i class="fa-solid fa-camera"></i> Use Pexels Photos
-                                    (Faster)</span>
-                            </label>
+                            <span id="instruction-text">The AI will expand your simple prompt into a heavily detailed cinematic Director's Vision.</span>
                         </div>
 
                         <button type="submit" class="generate-btn" id="generate-btn">
@@ -253,11 +134,6 @@
                             </div>
                         </div>
 
-                        <div id="final-script-display" class="final-script-box hidden">
-                            <small>Generated Script:</small>
-                            <p id="script-used-text"></p>
-                        </div>
-
                         <div class="video-wrapper">
                             <video id="preview-video" controls autoplay loop playsinline>
                                 <source src="" type="video/mp4">
@@ -279,7 +155,6 @@
         </section>
     </main>
 
-    <script src="/static/script.js"></script>
 </body>
 
 </html>

@@ -65,8 +65,12 @@ def get_output_media(audio_file_path, timed_captions, background_video_data, vid
     else:
         os.environ['IMAGEMAGICK_BINARY'] = '/usr/bin/convert'
     
-    audio_file_clip = AudioFileClip(audio_file_path)
-    duration = audio_file_clip.duration
+    if audio_file_path:
+        audio_file_clip = AudioFileClip(audio_file_path)
+        duration = audio_file_clip.duration
+    else:
+        # Determine duration from the last end time of background_video_data
+        duration = max((t2 for (t1, t2), url in background_video_data), default=10)
     
     # 1. Determine base size
     is_landscape = config.get_video_orientation()
@@ -160,16 +164,17 @@ def get_output_media(audio_file_path, timed_captions, background_video_data, vid
             print(f"Failed to add global fallback: {fe}")
     
     audio_clips = []
-    audio_file_clip = AudioFileClip(audio_file_path)
-    audio_clips.append(audio_file_clip)
+    if audio_file_path:
+        audio_file_clip = AudioFileClip(audio_file_path)
+        audio_clips.append(audio_file_clip)
     
     # Only add captions if enabled in config
-    if config.get_captions_enabled():
+    if config.get_captions_enabled() and timed_captions:
         for (t1, t2), raw_text in timed_captions:
             # Clean text: remove emojis but keep Unicode letters (Hindi/Marathi/etc.)
             import re as re_mod
             # Remove emojis and special symbols but preserve all language scripts
-            text = re_mod.sub(r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF\U00002702-\U000027B0]+', '', raw_text).strip()
+            text = re_mod.sub('[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF\U00002702-\U000027B0]+', '', raw_text).strip()
 
             if not text:
                 continue
@@ -209,6 +214,8 @@ def get_output_media(audio_file_path, timed_captions, background_video_data, vid
         audio = CompositeAudioClip(audio_clips)
         video.duration = audio.duration
         video.audio = audio
+    else:
+        video.duration = duration
 
     video.write_videofile(
         OUTPUT_FILE_NAME, 

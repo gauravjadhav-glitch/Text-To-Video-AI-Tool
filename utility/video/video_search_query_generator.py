@@ -129,7 +129,7 @@ Timed Captions:{}
         )
         text = response.choices[0].message.content.strip()
     
-    text = re.sub('\s+', ' ', text)
+    text = re.sub(r'\s+', ' ', text)
     
     if text.startswith('```json'):
         text = text[7:]
